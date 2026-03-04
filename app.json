@@ -2,11 +2,13 @@
   "expo": {
     "name": "Finstability",
     "slug": "finstability",
+    "owner": "trishaj1",
+    "scheme": "finstability",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
@@ -21,13 +23,19 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#00897B"
       },
-      "package": "com.trishajanath.finstability"
+      "package": "com.trishajanath.finstability",
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
       "expo-asset"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "b00b9305-e22f-4434-8fe8-092b7a8a094c"
+      }
+    }
   }
 }

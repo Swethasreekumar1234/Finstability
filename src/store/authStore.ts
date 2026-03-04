@@ -1,21 +1,39 @@
 /**
  * Auth store using Zustand for state management
- * Equivalent to AuthViewModel in the Kotlin version
+ * Firebase Authentication with Phone OTP and Google Sign-In
  */
 
 import { create } from 'zustand';
 import { User, UserType, RiskTolerance, OtpState } from '../types';
-import { authService } from '../services/authService';
+import {
+  sendOtpToPhone,
+  verifyOtpAndSignIn,
+  signInWithGoogleCredential,
+  checkUserExists,
+  getUserProfile,
+  saveUserProfile,
+  signOutUser,
+  setPhoneForVerification,
+} from '../config/firebase';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface AuthState {
+  // Firebase User
+  firebaseUid: string | null;
+  
   // Phone Login State
   phoneNumber: string;
   phoneError: string | null;
+  verificationId: string | null;
 
   // OTP State
   otpState: OtpState;
   enteredOtp: string;
   otpError: string | null;
+
+  // Google Auth State
+  isGoogleLoading: boolean;
+  authError: string | null;
 
   // Profile Setup State
   fullName: string;
@@ -31,12 +49,16 @@ interface AuthState {
   isLoggedIn: boolean;
   isInitialized: boolean;
 
-  // Actions
+  // Phone Auth Actions
   updatePhoneNumber: (phone: string) => void;
   sendOtp: () => Promise<boolean>;
   updateEnteredOtp: (otp: string) => void;
   verifyOtp: () => Promise<{ success: boolean; isNewUser: boolean }>;
   resendOtp: () => Promise<void>;
+
+  // Google Auth Actions
+  signInWithGoogle: (idToken: string) => Promise<{ success: boolean; isNewUser: boolean }>;
+  clearError: () => void;
 
   // Profile Actions
   updateFullName: (name: string) => void;
@@ -55,11 +77,15 @@ interface AuthState {
 
 export const useAuthStore = create<AuthState>((set, get) => ({
   // Initial State
+  firebaseUid: null,
   phoneNumber: '',
   phoneError: null,
+  verificationId: null,
   otpState: OtpState.IDLE,
   enteredOtp: '',
   otpError: null,
+  isGoogleLoading: false,
+  authError: null,
   fullName: '',
   email: '',
   selectedUserType: null,
@@ -85,20 +111,28 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       return false;
     }
 
-    if (!authService.isValidPhoneNumber(phoneNumber)) {
-      set({ phoneError: 'Please enter a valid 10-digit phone number' });
+    if (phoneNumber.length !== 10 || !/^[6-9]\d{9}$/.test(phoneNumber)) {
+      set({ phoneError: 'Please enter a valid 10-digit Indian mobile number' });
       return false;
     }
 
     set({ phoneError: null, otpState: OtpState.SENDING });
 
-    // Simulate network delay
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-
-    authService.generateOtp(phoneNumber);
-    set({ otpState: OtpState.SENT });
-
-    return true;
+    try {
+      // Store phone for verification reference
+      setPhoneForVerification(phoneNumber);
+      
+      // Send OTP via Firebase
+      const verId = await sendOtpToPhone(phoneNumber);
+      set({ verificationId: verId, otpState: OtpState.SENT });
+      return true;
+    } catch (error: any) {
+      set({
+        phoneError: error.message || 'Failed to send OTP',
+        otpState: OtpState.ERROR,
+      });
+      return false;
+    }
   },
 
   // OTP Actions
@@ -108,47 +142,108 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   verifyOtp: async () => {
-    const { enteredOtp } = get();
+    const { enteredOtp, verificationId, phoneNumber } = get();
 
     if (enteredOtp.length !== 6) {
       set({ otpError: 'Please enter all 6 digits' });
       return { success: false, isNewUser: false };
     }
 
-    set({ otpState: OtpState.VERIFYING });
+    set({ otpState: OtpState.VERIFYING, otpError: null });
 
-    // Simulate verification delay
-    await new Promise((resolve) => setTimeout(resolve, 500));
+    try {
+      // Verify OTP with Firebase
+      const user = await verifyOtpAndSignIn(enteredOtp, verificationId || undefined);
+      const uid = user.uid;
+      
+      set({ 
+        otpState: OtpState.VERIFIED,
+        firebaseUid: uid,
+      });
+      
+      // Save UID to AsyncStorage
+      await AsyncStorage.setItem('firebaseUid', uid);
+      await AsyncStorage.setItem('phoneNumber', phoneNumber);
 
-    if (authService.verifyOtp(enteredOtp)) {
-      set({ otpState: OtpState.VERIFIED });
-      await authService.setLoggedIn(authService.getCurrentPhoneNumber());
+      // Check if user profile exists in Firestore
+      const exists = await checkUserExists(uid);
 
-      const profileExists = await authService.isUserProfileExists();
-
-      if (profileExists) {
+      if (exists) {
+        // Load existing profile
         await get().loadUserProfile();
         set({ isLoggedIn: true });
         return { success: true, isNewUser: false };
       } else {
+        // New user - needs profile setup
         return { success: true, isNewUser: true };
       }
-    } else {
+    } catch (error: any) {
       set({
         otpState: OtpState.ERROR,
-        otpError: 'Invalid OTP. Please try again.',
+        otpError: error.message || 'Invalid OTP. Please try again.',
       });
       return { success: false, isNewUser: false };
     }
   },
 
   resendOtp: async () => {
+    const { phoneNumber } = get();
     set({ otpState: OtpState.SENDING, enteredOtp: '', otpError: null });
 
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    try {
+      const verId = await sendOtpToPhone(phoneNumber);
+      set({ verificationId: verId, otpState: OtpState.SENT });
+    } catch (error: any) {
+      set({
+        otpError: error.message || 'Failed to resend OTP',
+        otpState: OtpState.ERROR,
+      });
+    }
+  },
 
-    authService.generateOtp(authService.getCurrentPhoneNumber());
-    set({ otpState: OtpState.SENT });
+  // Google Sign-In
+  signInWithGoogle: async (idToken: string) => {
+    set({ isGoogleLoading: true, authError: null });
+
+    try {
+      const user = await signInWithGoogleCredential(idToken);
+      const uid = user.uid;
+      
+      set({ firebaseUid: uid });
+      
+      // Save UID to AsyncStorage
+      await AsyncStorage.setItem('firebaseUid', uid);
+      
+      // Pre-fill email from Google account
+      if (user.email) {
+        set({ email: user.email });
+      }
+      if (user.displayName) {
+        set({ fullName: user.displayName });
+      }
+
+      // Check if user profile exists in Firestore
+      const exists = await checkUserExists(uid);
+
+      if (exists) {
+        await get().loadUserProfile();
+        set({ isLoggedIn: true, isGoogleLoading: false });
+        return { success: true, isNewUser: false };
+      } else {
+        set({ isGoogleLoading: false });
+        return { success: true, isNewUser: true };
+      }
+    } catch (error: any) {
+      set({
+        isGoogleLoading: false,
+        authError: error.message || 'Google sign-in failed',
+      });
+      return { success: false, isNewUser: false };
+    }
+  },
+
+  clearError: () => {
+    set({ authError: null, phoneError: null, otpError: null });
   },
 
   // Profile Actions
@@ -174,8 +269,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   saveProfile: async () => {
-    const { fullName, email, selectedUserType, monthlyIncome, selectedRiskTolerance, phoneNumber } =
-      get();
+    const { 
+      fullName, email, selectedUserType, monthlyIncome, 
+      selectedRiskTolerance, phoneNumber, firebaseUid 
+    } = get();
 
     // Validation
     if (!fullName.trim()) {
@@ -201,10 +298,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ isProfileSaving: true, profileError: null });
 
     try {
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      const uid = firebaseUid || await AsyncStorage.getItem('firebaseUid');
+      
+      if (!uid) {
+        throw new Error('No user ID found. Please sign in again.');
+      }
 
-      const user: Omit<User, 'createdAt'> = {
-        phoneNumber: phoneNumber || authService.getCurrentPhoneNumber(),
+      const profileData = {
+        phoneNumber: phoneNumber || '',
         fullName: fullName.trim(),
         email: email.trim(),
         userType: selectedUserType,
@@ -212,15 +313,26 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         riskTolerance: selectedRiskTolerance,
       };
 
-      await authService.saveUserProfile(user);
-      await get().loadUserProfile();
-
-      set({ isProfileSaving: false, isLoggedIn: true });
+      // Save to Firestore
+      await saveUserProfile(uid, profileData);
+      
+      // Update local state
+      const user: User = {
+        ...profileData,
+        createdAt: Date.now(),
+      };
+      
+      set({ 
+        currentUser: user, 
+        isProfileSaving: false, 
+        isLoggedIn: true 
+      });
+      
       return true;
-    } catch (error) {
+    } catch (error: any) {
       set({
         isProfileSaving: false,
-        profileError: 'Failed to save profile. Please try again.',
+        profileError: error.message || 'Failed to save profile. Please try again.',
       });
       return false;
     }
@@ -228,18 +340,48 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   // User Actions
   loadUserProfile: async () => {
-    const user = await authService.loadUserProfile();
-    set({ currentUser: user });
+    try {
+      const uid = get().firebaseUid || await AsyncStorage.getItem('firebaseUid');
+      
+      if (!uid) return;
+
+      const profile = await getUserProfile(uid);
+      
+      if (profile) {
+        const user: User = {
+          phoneNumber: profile.phoneNumber || '',
+          fullName: profile.fullName || '',
+          email: profile.email || '',
+          userType: profile.userType as UserType,
+          monthlyIncome: profile.monthlyIncome || 0,
+          riskTolerance: profile.riskTolerance as RiskTolerance,
+          createdAt: profile.createdAt?.toMillis?.() || Date.now(),
+        };
+        set({ currentUser: user });
+      }
+    } catch (error) {
+      console.error('Error loading user profile:', error);
+    }
   },
 
   logout: async () => {
-    await authService.logout();
+    try {
+      await signOutUser();
+      await AsyncStorage.multiRemove(['firebaseUid', 'phoneNumber']);
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
+    
     set({
+      firebaseUid: null,
       phoneNumber: '',
       phoneError: null,
+      verificationId: null,
       otpState: OtpState.IDLE,
       enteredOtp: '',
       otpError: null,
+      isGoogleLoading: false,
+      authError: null,
       fullName: '',
       email: '',
       selectedUserType: null,
@@ -253,13 +395,25 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   initialize: async () => {
-    const isLoggedIn = await authService.isLoggedIn();
-    const profileExists = await authService.isUserProfileExists();
-
-    if (isLoggedIn && profileExists) {
-      const user = await authService.loadUserProfile();
-      set({ isLoggedIn: true, currentUser: user, isInitialized: true });
-    } else {
+    try {
+      const uid = await AsyncStorage.getItem('firebaseUid');
+      
+      if (uid) {
+        set({ firebaseUid: uid });
+        
+        // Check if profile exists
+        const exists = await checkUserExists(uid);
+        
+        if (exists) {
+          await get().loadUserProfile();
+          set({ isLoggedIn: true, isInitialized: true });
+          return;
+        }
+      }
+      
+      set({ isLoggedIn: false, isInitialized: true });
+    } catch (error) {
+      console.error('Error initializing auth:', error);
       set({ isLoggedIn: false, isInitialized: true });
     }
   },
@@ -270,6 +424,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       otpState: OtpState.IDLE,
       enteredOtp: '',
       otpError: null,
+      authError: null,
     });
   },
 }));

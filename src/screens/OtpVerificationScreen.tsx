@@ -96,7 +96,7 @@ export default function OtpVerificationScreen({ navigation }: Props) {
           {/* Testing Hint */}
           <View style={styles.hintCard}>
             <Text style={styles.hintText}>
-              💡 Check console/terminal for OTP (Filter: OTP GENERATED)
+              💡 Test Mode: Enter "123456" as OTP to verify
             </Text>
           </View>
 

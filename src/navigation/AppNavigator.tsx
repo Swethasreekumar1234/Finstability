@@ -9,6 +9,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types';
 import {
+  LoginScreen,
   PhoneLoginScreen,
   OtpVerificationScreen,
   ProfileSetupScreen,
@@ -42,12 +43,13 @@ export default function AppNavigator() {
   return (
     <NavigationContainer>
       <Stack.Navigator
-        initialRouteName={isLoggedIn ? 'Dashboard' : 'PhoneLogin'}
+        initialRouteName={isLoggedIn ? 'Dashboard' : 'Login'}
         screenOptions={{
           headerShown: false,
           animation: 'slide_from_right',
         }}
       >
+        <Stack.Screen name="Login" component={LoginScreen} />
         <Stack.Screen name="PhoneLogin" component={PhoneLoginScreen} />
         <Stack.Screen name="OtpVerification" component={OtpVerificationScreen} />
         <Stack.Screen name="ProfileSetup" component={ProfileSetupScreen} />

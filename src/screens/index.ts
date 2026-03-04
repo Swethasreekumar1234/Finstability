@@ -1,3 +1,4 @@
+export { default as LoginScreen } from './LoginScreen';
 export { default as PhoneLoginScreen } from './PhoneLoginScreen';
 export { default as OtpVerificationScreen } from './OtpVerificationScreen';
 export { default as ProfileSetupScreen } from './ProfileSetupScreen';

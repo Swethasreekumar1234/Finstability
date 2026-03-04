@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "793985902050",
+    "project_id": "finstability-3e71d",
+    "storage_bucket": "finstability-3e71d.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:793985902050:android:e09e9af9944d54b70185bb",
+        "android_client_info": {
+          "package_name": "com.trishajanath.finstability"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "793985902050-hm0bu890qe1f2hi5dbvfr9re7lp7pq0e.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.trishajanath.finstability",
+            "certificate_hash": "519c688fb7dabf3250830a77af1326a6f43ae74d"
+          }
+        },
+        {
+          "client_id": "793985902050-fh14tv9v63afmojstglvmh7a4sfr2vti.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAGTZmGgwhwymtvct0ZIXVdg3PvZzbiWkQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "793985902050-fh14tv9v63afmojstglvmh7a4sfr2vti.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

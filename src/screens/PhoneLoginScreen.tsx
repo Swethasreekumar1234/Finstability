@@ -1,7 +1,6 @@
 /**
  * Phone Login Screen
- * Entry point for authentication flow.
- * User enters their 10-digit phone number to receive an OTP.
+ * Phone number entry for Firebase OTP authentication.
  */
 
 import React from 'react';
@@ -51,9 +50,18 @@ export default function PhoneLoginScreen({ navigation }: Props) {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
+      {/* reCAPTCHA container for web - invisible */}
+      <View nativeID="recaptcha-container" />
+      
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Finstability</Text>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => navigation.goBack()}
+        >
+          <Text style={styles.backButtonText}>←</Text>
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Phone Login</Text>
       </View>
 
       <KeyboardAvoidingView
@@ -69,41 +77,60 @@ export default function PhoneLoginScreen({ navigation }: Props) {
             <Text style={styles.icon}>📱</Text>
           </View>
 
-          {/* Welcome Text */}
-          <Text style={styles.title}>Welcome to Finstability</Text>
-          <Text style={styles.subtitle}>Your personal finance companion</Text>
+          {/* Title */}
+          <Text style={styles.title}>Enter Phone Number</Text>
+          <Text style={styles.subtitle}>
+            We'll send you a 6-digit OTP for verification
+          </Text>
 
           {/* Phone Input Section */}
           <View style={styles.inputSection}>
-            <Text style={styles.inputLabel}>Enter your phone number</Text>
+            <Text style={styles.inputLabel}>Mobile Number</Text>
 
-            <View style={styles.phoneInputContainer}>
+            <View style={[
+              styles.phoneInputContainer,
+              phoneError && styles.inputContainerError
+            ]}>
               <View style={styles.countryCode}>
+                <Text style={styles.flag}>🇮🇳</Text>
                 <Text style={styles.countryCodeText}>+91</Text>
               </View>
               <TextInput
-                style={[styles.phoneInput, phoneError && styles.inputError]}
+                style={styles.phoneInput}
                 value={phoneNumber}
                 onChangeText={updatePhoneNumber}
-                placeholder="10-digit mobile number"
+                placeholder="Enter 10-digit number"
                 placeholderTextColor={Colors.onSurfaceVariant}
                 keyboardType="phone-pad"
                 maxLength={10}
                 editable={!isLoading}
+                autoFocus
               />
             </View>
 
             {phoneError && <Text style={styles.errorText}>{phoneError}</Text>}
           </View>
 
+          {/* Test Mode Notice */}
+          <View style={styles.noticeCard}>
+            <Text style={styles.noticeIcon}>💡</Text>
+            <View style={styles.noticeContent}>
+              <Text style={styles.noticeTitle}>Test Mode</Text>
+              <Text style={styles.noticeText}>
+                For Expo Go: Use OTP "123456" to verify{'\n'}
+                Real SMS requires EAS development build
+              </Text>
+            </View>
+          </View>
+
           {/* Send OTP Button */}
           <TouchableOpacity
             style={[
               styles.button,
-              (!phoneNumber || isLoading) && styles.buttonDisabled,
+              (phoneNumber.length !== 10 || isLoading) && styles.buttonDisabled,
             ]}
             onPress={handleSendOtp}
-            disabled={!phoneNumber || isLoading}
+            disabled={phoneNumber.length !== 10 || isLoading}
           >
             {isLoading ? (
               <View style={styles.loadingContainer}>
@@ -114,18 +141,6 @@ export default function PhoneLoginScreen({ navigation }: Props) {
               <Text style={styles.buttonText}>Send OTP</Text>
             )}
           </TouchableOpacity>
-
-          {/* Info Text */}
-          <Text style={styles.infoText}>
-            We'll send you a 6-digit verification code
-          </Text>
-
-          {/* Terms */}
-          <View style={styles.termsContainer}>
-            <Text style={styles.termsText}>
-              By continuing, you agree to our Terms of Service and Privacy Policy
-            </Text>
-          </View>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -140,7 +155,18 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: Colors.primary,
     paddingVertical: 16,
-    paddingHorizontal: 24,
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  backButton: {
+    padding: 8,
+    marginRight: 8,
+  },
+  backButtonText: {
+    fontSize: 20,
+    color: Colors.onPrimary,
+    fontWeight: 'bold',
   },
   headerTitle: {
     fontSize: 20,
@@ -153,7 +179,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
     paddingHorizontal: 24,
-    paddingTop: 48,
+    paddingTop: 40,
   },
   iconContainer: {
     alignItems: 'center',
@@ -163,70 +189,105 @@ const styles = StyleSheet.create({
     fontSize: 64,
   },
   title: {
-    fontSize: 24,
+    fontSize: 26,
     fontWeight: 'bold',
     color: Colors.onSurface,
     textAlign: 'center',
   },
   subtitle: {
-    fontSize: 16,
+    fontSize: 15,
     color: Colors.onSurfaceVariant,
     textAlign: 'center',
     marginTop: 8,
+    lineHeight: 22,
   },
   inputSection: {
-    marginTop: 48,
+    marginTop: 32,
   },
   inputLabel: {
-    fontSize: 16,
-    fontWeight: '500',
+    fontSize: 14,
+    fontWeight: '600',
     color: Colors.onSurface,
     marginBottom: 8,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   phoneInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: Colors.surface,
-    borderRadius: 8,
-    borderWidth: 1,
+    borderRadius: 12,
+    borderWidth: 2,
     borderColor: Colors.secondaryLight,
   },
+  inputContainerError: {
+    borderColor: Colors.error,
+  },
   countryCode: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 16,
     borderRightWidth: 1,
     borderRightColor: Colors.secondaryLight,
+    gap: 8,
+  },
+  flag: {
+    fontSize: 20,
   },
   countryCodeText: {
     fontSize: 16,
     color: Colors.onSurface,
-    fontWeight: '500',
+    fontWeight: '600',
   },
   phoneInput: {
     flex: 1,
     paddingHorizontal: 16,
     paddingVertical: 16,
-    fontSize: 16,
+    fontSize: 18,
     color: Colors.onSurface,
-  },
-  inputError: {
-    borderColor: Colors.error,
+    letterSpacing: 1,
   },
   errorText: {
     color: Colors.error,
-    fontSize: 14,
+    fontSize: 13,
     marginTop: 8,
+  },
+  noticeCard: {
+    flexDirection: 'row',
+    backgroundColor: Colors.secondaryContainer,
+    borderRadius: 12,
+    padding: 14,
+    marginTop: 24,
+  },
+  noticeIcon: {
+    fontSize: 20,
+    marginRight: 12,
+  },
+  noticeContent: {
+    flex: 1,
+  },
+  noticeTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.onSecondaryContainer,
+    marginBottom: 4,
+  },
+  noticeText: {
+    fontSize: 12,
+    color: Colors.onSecondaryContainer,
+    lineHeight: 18,
   },
   button: {
     backgroundColor: Colors.primary,
     paddingVertical: 16,
-    borderRadius: 8,
+    borderRadius: 12,
     alignItems: 'center',
-    marginTop: 24,
+    marginTop: 32,
   },
   buttonDisabled: {
     backgroundColor: Colors.primaryLight,
-    opacity: 0.7,
+    opacity: 0.6,
   },
   loadingContainer: {
     flexDirection: 'row',
@@ -237,22 +298,5 @@ const styles = StyleSheet.create({
     color: Colors.onPrimary,
     fontSize: 16,
     fontWeight: '600',
-  },
-  infoText: {
-    textAlign: 'center',
-    color: Colors.onSurfaceVariant,
-    fontSize: 14,
-    marginTop: 16,
-  },
-  termsContainer: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    paddingBottom: 24,
-    marginTop: 24,
-  },
-  termsText: {
-    textAlign: 'center',
-    color: Colors.onSurfaceVariant,
-    fontSize: 12,
   },
 });

@@ -51,6 +51,7 @@ export enum OtpState {
 
 // Navigation param types
 export type RootStackParamList = {
+  Login: undefined;
   PhoneLogin: undefined;
   OtpVerification: undefined;
   ProfileSetup: undefined;
