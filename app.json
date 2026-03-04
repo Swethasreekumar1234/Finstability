@@ -1,0 +1,33 @@
+{
+  "expo": {
+    "name": "Finstability",
+    "slug": "finstability",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#00897B"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.trishajanath.finstability"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#00897B"
+      },
+      "package": "com.trishajanath.finstability"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-asset"
+    ]
+  }
+}
