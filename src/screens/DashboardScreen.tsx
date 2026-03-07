@@ -3,7 +3,7 @@
  * Apple/Stripe inspired dark theme with glassmorphism
  */
 
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -17,6 +17,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   RootStackParamList,
@@ -35,6 +36,10 @@ import {
   AITypography,
 } from '../theme/aiTheme';
 import { GlassCard, ProgressBar } from '../components/ai';
+import {
+  getFinancialRecommendations,
+  FinancialRecommendations,
+} from '../services/recommendationEngine';
 
 const { width } = Dimensions.get('window');
 const FINANCIAL_PROFILE_KEY = 'financial_profile';
@@ -47,6 +52,7 @@ export default function DashboardScreen({ navigation }: Props) {
   const { currentUser: user, isProfileSaving: isLoading, logout } = useAuthStore();
   const [financialProfile, setFinancialProfile] = useState<FinancialProfile | null>(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
+  const [recommendations, setRecommendations] = useState<FinancialRecommendations | null>(null);
   
   // Animations
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -54,8 +60,14 @@ export default function DashboardScreen({ navigation }: Props) {
   const pulseAnim = useRef(new Animated.Value(0.3)).current;
   const cardAnims = useRef([...Array(4)].map(() => new Animated.Value(0))).current;
 
+  // Reload profile when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      loadFinancialProfile();
+    }, [user])
+  );
+
   useEffect(() => {
-    loadFinancialProfile();
     startAnimations();
   }, []);
 
@@ -104,9 +116,33 @@ export default function DashboardScreen({ navigation }: Props) {
 
   const loadFinancialProfile = async () => {
     try {
+      setLoadingProfile(true);
       const data = await AsyncStorage.getItem(FINANCIAL_PROFILE_KEY);
       if (data) {
-        setFinancialProfile(JSON.parse(data));
+        const profile = JSON.parse(data);
+        setFinancialProfile(profile);
+        
+        // Generate personalized recommendations
+        if (user) {
+          const recs = getFinancialRecommendations(
+            user.userType,
+            profile.monthlyIncome || user.monthlyIncome || 0,
+            profile.riskTolerance || user.riskTolerance,
+            profile.financialGoals || [],
+            profile
+          );
+          setRecommendations(recs);
+        }
+      } else if (user) {
+        // Generate recommendations based on user profile only
+        const recs = getFinancialRecommendations(
+          user.userType,
+          user.monthlyIncome || 0,
+          user.riskTolerance,
+          [],
+          undefined
+        );
+        setRecommendations(recs);
       }
     } catch (error) {
       console.error('Error loading profile:', error);
@@ -365,6 +401,127 @@ export default function DashboardScreen({ navigation }: Props) {
               </GlassCard>
             </View>
 
+            {/* AI Recommendations Preview */}
+            {recommendations && (
+              <View style={styles.recommendationsSection}>
+                {/* All Government Schemes */}
+                {recommendations.schemes.length > 0 && (
+                  <>
+                    <View style={styles.sectionHeader}>
+                      <Text style={styles.sectionIcon}>◇</Text>
+                      <Text style={styles.sectionTitle}>Government Schemes For You</Text>
+                    </View>
+                    <Text style={styles.sectionSubtitle}>{recommendations.schemes.length} schemes matched to your profile</Text>
+                    {recommendations.schemes.map((scheme, index) => (
+                      <View key={`scheme-${index}`} style={styles.recCard}>
+                        <View style={styles.recCardHeader}>
+                          <View style={[styles.recBadge, { backgroundColor: AIColors.primaryDim }]}>
+                            <Text style={[styles.recBadgeText, { color: AIColors.primary }]}>{scheme.category.toUpperCase()}</Text>
+                          </View>
+                          <Text style={styles.recCardIndex}>{index + 1}/{recommendations.schemes.length}</Text>
+                        </View>
+                        <Text style={styles.recCardTitle}>{scheme.scheme_name}</Text>
+                        <Text style={styles.recCardDesc}>{scheme.description}</Text>
+                        <View style={styles.recCardDetails}>
+                          <Text style={styles.recCardDetailLabel}>Benefits:</Text>
+                          <Text style={styles.recCardDetailText}>{scheme.benefits}</Text>
+                        </View>
+                        <View style={styles.recCardDetails}>
+                          <Text style={styles.recCardDetailLabel}>Eligibility:</Text>
+                          <Text style={styles.recCardDetailText}>{scheme.eligibility}</Text>
+                        </View>
+                      </View>
+                    ))}
+                  </>
+                )}
+
+                {/* All Loan Options */}
+                {recommendations.loans.length > 0 && (
+                  <>
+                    <View style={[styles.sectionHeader, { marginTop: AISpacing.xl }]}>
+                      <Text style={styles.sectionIcon}>□</Text>
+                      <Text style={styles.sectionTitle}>Recommended Loans</Text>
+                    </View>
+                    <Text style={styles.sectionSubtitle}>{recommendations.loans.length} loan types suited for you</Text>
+                    {recommendations.loans.map((loan, index) => (
+                      <View key={`loan-${index}`} style={styles.recCard}>
+                        <View style={styles.recCardHeader}>
+                          <View style={[styles.recBadge, { backgroundColor: AIColors.secondaryDim }]}>
+                            <Text style={[styles.recBadgeText, { color: AIColors.secondary }]}>{loan.type.toUpperCase()}</Text>
+                          </View>
+                          <Text style={[styles.recRate, { color: AIColors.secondary }]}>{loan.interestRange}</Text>
+                        </View>
+                        <Text style={styles.recCardTitle}>{loan.name}</Text>
+                        <Text style={styles.recCardDesc}>{loan.description}</Text>
+                        <View style={styles.recCardDetails}>
+                          <Text style={styles.recCardDetailLabel}>Max Amount:</Text>
+                          <Text style={styles.recCardDetailText}>{loan.maxAmount}</Text>
+                        </View>
+                        <View style={styles.recCardDetails}>
+                          <Text style={styles.recCardDetailLabel}>Features:</Text>
+                          <Text style={styles.recCardDetailText}>{loan.features.join(', ')}</Text>
+                        </View>
+                      </View>
+                    ))}
+                  </>
+                )}
+
+                {/* All Investment Options */}
+                {recommendations.investments.length > 0 && (
+                  <>
+                    <View style={[styles.sectionHeader, { marginTop: AISpacing.xl }]}>
+                      <Text style={styles.sectionIcon}>△</Text>
+                      <Text style={styles.sectionTitle}>Investment Recommendations</Text>
+                    </View>
+                    <Text style={styles.sectionSubtitle}>{recommendations.investments.length} investment options for your goals</Text>
+                    {recommendations.investments.map((inv, index) => (
+                      <View key={`inv-${index}`} style={styles.recCard}>
+                        <View style={styles.recCardHeader}>
+                          <View style={[styles.recBadge, { backgroundColor: AIColors.successDim }]}>
+                            <Text style={[styles.recBadgeText, { color: AIColors.success }]}>{inv.riskLevel} RISK</Text>
+                          </View>
+                          <Text style={[styles.recRate, { color: AIColors.success }]}>{inv.expectedReturns}</Text>
+                        </View>
+                        <Text style={styles.recCardTitle}>{inv.name}</Text>
+                        <Text style={styles.recCardDesc}>{inv.description}</Text>
+                        <View style={styles.recCardRow}>
+                          <View style={styles.recCardDetails}>
+                            <Text style={styles.recCardDetailLabel}>Min Investment:</Text>
+                            <Text style={styles.recCardDetailText}>{inv.minInvestment}</Text>
+                          </View>
+                          <View style={styles.recCardDetails}>
+                            <Text style={styles.recCardDetailLabel}>Lock-in:</Text>
+                            <Text style={styles.recCardDetailText}>{inv.lockInPeriod}</Text>
+                          </View>
+                        </View>
+                        {inv.taxBenefits && (
+                          <View style={styles.taxBadge}>
+                            <Text style={styles.taxBadgeText}>✓ Tax Benefits Available</Text>
+                          </View>
+                        )}
+                      </View>
+                    ))}
+                  </>
+                )}
+
+                {/* AI Tips */}
+                {recommendations.tips.length > 0 && (
+                  <>
+                    <View style={[styles.sectionHeader, { marginTop: AISpacing.xl }]}>
+                      <Text style={styles.sectionIcon}>◆</Text>
+                      <Text style={styles.sectionTitle}>Personalized Tips</Text>
+                    </View>
+                    {recommendations.tips.map((tip, index) => (
+                      <View key={`tip-${index}`} style={styles.tipCard}>
+                        <Text style={styles.tipNumber}>{index + 1}</Text>
+                        <Text style={styles.tipText}>{tip}</Text>
+                      </View>
+                    ))}
+                  </>
+                )}
+              </View>
+            )}
+
             {/* Action Button */}
             <TouchableOpacity
               style={styles.actionButton}
@@ -378,6 +535,16 @@ export default function DashboardScreen({ navigation }: Props) {
                 <Text style={styles.actionButtonSubtitle}>Keep your data current for better insights</Text>
               </View>
               <Text style={styles.actionButtonArrow}>→</Text>
+            </TouchableOpacity>
+
+            {/* Logout Button */}
+            <TouchableOpacity
+              style={styles.logoutButton}
+              onPress={handleSignOut}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.logoutIcon}>⏻</Text>
+              <Text style={styles.logoutText}>Sign Out</Text>
             </TouchableOpacity>
 
             {/* Footer */}
@@ -795,6 +962,145 @@ const styles = StyleSheet.create({
   actionButtonArrow: {
     fontSize: 20,
     color: AIColors.primary,
+  },
+
+  // Recommendations Section
+  recommendationsSection: {
+    marginBottom: AISpacing.lg,
+  },
+  recCard: {
+    backgroundColor: AIColors.surface,
+    borderRadius: AIRadius.xl,
+    padding: AISpacing.md,
+    borderWidth: 1,
+    borderColor: AIColors.border,
+    marginBottom: AISpacing.sm,
+  },
+  recCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: AISpacing.xs,
+  },
+  recBadge: {
+    paddingHorizontal: AISpacing.sm,
+    paddingVertical: 4,
+    borderRadius: AIRadius.md,
+  },
+  recBadgeText: {
+    ...AITypography.labelSmall,
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  recRate: {
+    ...AITypography.label,
+    fontWeight: '600',
+  },
+  recCardTitle: {
+    ...AITypography.body,
+    fontWeight: '600',
+    color: AIColors.text,
+    marginBottom: 4,
+  },
+  recCardDesc: {
+    ...AITypography.bodySmall,
+    color: AIColors.textSecondary,
+    marginBottom: AISpacing.sm,
+  },
+  recCardIndex: {
+    ...AITypography.labelSmall,
+    color: AIColors.textMuted,
+  },
+  recCardDetails: {
+    marginTop: AISpacing.xs,
+  },
+  recCardDetailLabel: {
+    ...AITypography.labelSmall,
+    color: AIColors.textMuted,
+    marginBottom: 2,
+  },
+  recCardDetailText: {
+    ...AITypography.bodySmall,
+    color: AIColors.textSecondary,
+  },
+  recCardRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: AISpacing.xs,
+  },
+  sectionSubtitle: {
+    ...AITypography.bodySmall,
+    color: AIColors.textSecondary,
+    marginBottom: AISpacing.md,
+    marginTop: -AISpacing.xs,
+  },
+  taxBadge: {
+    backgroundColor: AIColors.successDim,
+    paddingHorizontal: AISpacing.sm,
+    paddingVertical: 4,
+    borderRadius: AIRadius.md,
+    marginTop: AISpacing.sm,
+    alignSelf: 'flex-start',
+  },
+  taxBadgeText: {
+    ...AITypography.labelSmall,
+    color: AIColors.success,
+    fontSize: 11,
+  },
+  tipCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: AIColors.primaryDim,
+    padding: AISpacing.md,
+    borderRadius: AIRadius.lg,
+    borderWidth: 1,
+    borderColor: AIColors.primary,
+    marginTop: AISpacing.sm,
+  },
+  tipNumber: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: AIColors.primary,
+    color: AIColors.background,
+    textAlign: 'center',
+    lineHeight: 24,
+    fontWeight: '700',
+    marginRight: AISpacing.md,
+    fontSize: 12,
+  },
+  tipIcon: {
+    fontSize: 16,
+    color: AIColors.primary,
+    marginRight: AISpacing.sm,
+  },
+  tipText: {
+    flex: 1,
+    ...AITypography.bodySmall,
+    color: AIColors.text,
+  },
+
+  // Logout Button
+  logoutButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: AIColors.surface,
+    padding: AISpacing.md,
+    borderRadius: AIRadius.xl,
+    borderWidth: 1,
+    borderColor: AIColors.error,
+    marginBottom: AISpacing.lg,
+  },
+  logoutIcon: {
+    fontSize: 18,
+    color: AIColors.error,
+    marginRight: AISpacing.sm,
+  },
+  logoutText: {
+    ...AITypography.body,
+    color: AIColors.error,
+    fontWeight: '600',
   },
 
   // Footer
