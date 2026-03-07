@@ -298,11 +298,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ isProfileSaving: true, profileError: null });
 
     try {
-      const uid = firebaseUid || await AsyncStorage.getItem('firebaseUid');
-      
-      if (!uid) {
-        throw new Error('No user ID found. Please sign in again.');
-      }
+      const uid = firebaseUid || await AsyncStorage.getItem('firebaseUid') || `local-${Date.now()}`;
 
       const profileData = {
         phoneNumber: phoneNumber || '',
@@ -313,8 +309,24 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         riskTolerance: selectedRiskTolerance,
       };
 
-      // Save to Firestore
-      await saveUserProfile(uid, profileData);
+      // Save to local AsyncStorage first (always works)
+      await AsyncStorage.multiSet([
+        ['user_fullName', profileData.fullName],
+        ['user_email', profileData.email],
+        ['user_userType', profileData.userType],
+        ['user_monthlyIncome', String(profileData.monthlyIncome)],
+        ['user_riskTolerance', profileData.riskTolerance],
+        ['user_phoneNumber', profileData.phoneNumber],
+        ['isLoggedIn', 'true'],
+      ]);
+      
+      // Try to save to Firestore (with timeout, won't block)
+      try {
+        await saveUserProfile(uid, profileData);
+      } catch (firestoreError) {
+        console.warn('Firestore save skipped:', firestoreError);
+        // Continue anyway - local storage is saved
+      }
       
       // Update local state
       const user: User = {

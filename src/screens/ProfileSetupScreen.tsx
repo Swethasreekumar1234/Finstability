@@ -1,20 +1,20 @@
 /**
- * Profile Setup Screen
- * Collects user profile information after successful OTP verification.
- * First-time users must complete this before accessing the dashboard.
+ * Profile Setup Screen - Futuristic AI Financial Platform
+ * Apple/Stripe inspired dark theme with glassmorphism
  */
 
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  ActivityIndicator,
+  ScrollView,
   KeyboardAvoidingView,
   Platform,
-  ScrollView,
+  ActivityIndicator,
+  Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -26,31 +26,119 @@ import {
   RiskToleranceLabels,
 } from '../types';
 import { useAuthStore } from '../store/authStore';
-import { Colors } from '../theme/colors';
+import { AIColors, AISpacing, AIRadius, AIShadows, AITypography } from '../theme/aiTheme';
+import { GlassCard, ProgressBar, SelectionCard } from '../components/ai';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'ProfileSetup'>;
 };
 
+const userTypes = [
+  { type: UserType.STUDENT, icon: '○', description: 'Learning to manage finances' },
+  { type: UserType.WORKING_PROFESSIONAL, icon: '◇', description: 'Building wealth actively' },
+  { type: UserType.RETIREE, icon: '□', description: 'Planning for retirement' },
+  { type: UserType.SMALL_BUSINESS_OWNER, icon: '△', description: 'Managing business finances' },
+];
+
+const riskLevels = [
+  { level: RiskTolerance.LOW, icon: '—', description: 'Prefer stability over high returns' },
+  { level: RiskTolerance.MODERATE, icon: '≡', description: 'Balance between risk and safety' },
+  { level: RiskTolerance.HIGH, icon: '↑', description: 'Comfortable with market volatility' },
+];
+
 export default function ProfileSetupScreen({ navigation }: Props) {
-  const {
+  const { 
+    currentUser,
     fullName,
-    email,
     selectedUserType,
     monthlyIncome,
     selectedRiskTolerance,
-    profileError,
-    isProfileSaving,
     updateFullName,
-    updateEmail,
     updateUserType,
     updateMonthlyIncome,
     updateRiskTolerance,
     saveProfile,
+    isProfileSaving,
+    profileError,
   } = useAuthStore();
+  
+  const [step, setStep] = useState(1);
+  const [localFullName, setLocalFullName] = useState(currentUser?.displayName || fullName || '');
+  const [localEmail, setLocalEmail] = useState(currentUser?.email || '');
+  const [localUserType, setLocalUserType] = useState<UserType | null>(selectedUserType);
+  const [localMonthlyIncome, setLocalMonthlyIncome] = useState(monthlyIncome || '');
+  const [localRiskTolerance, setLocalRiskTolerance] = useState<RiskTolerance | null>(selectedRiskTolerance);
 
-  const handleSaveProfile = async () => {
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(30)).current;
+
+  const totalSteps = 4;
+  const progress = step / totalSteps;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 400,
+        useNativeDriver: true,
+      }),
+      Animated.spring(slideAnim, {
+        toValue: 0,
+        tension: 80,
+        friction: 10,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [step]);
+
+  const animateStepChange = () => {
+    fadeAnim.setValue(0);
+    slideAnim.setValue(30);
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 400,
+        useNativeDriver: true,
+      }),
+      Animated.spring(slideAnim, {
+        toValue: 0,
+        tension: 80,
+        friction: 10,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
+
+  const handleNext = () => {
+    if (step < totalSteps) {
+      setStep(step + 1);
+      animateStepChange();
+    } else {
+      handleSubmit();
+    }
+  };
+
+  const handleBack = () => {
+    if (step > 1) {
+      setStep(step - 1);
+      animateStepChange();
+    }
+  };
+
+  const handleSubmit = async () => {
+    if (!localUserType || !localRiskTolerance) return;
+    
+    // Update store state with local values
+    updateFullName(localFullName);
+    updateUserType(localUserType);
+    updateMonthlyIncome(localMonthlyIncome);
+    updateRiskTolerance(localRiskTolerance);
+    
+    // Small delay to ensure store is updated
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
     const success = await saveProfile();
+
     if (success) {
       navigation.reset({
         index: 0,
@@ -59,311 +147,598 @@ export default function ProfileSetupScreen({ navigation }: Props) {
     }
   };
 
+  const canProceed = () => {
+    switch (step) {
+      case 1:
+        return localFullName.trim().length >= 2;
+      case 2:
+        return localUserType !== null;
+      case 3:
+        return localMonthlyIncome.trim().length > 0 && !isNaN(parseFloat(localMonthlyIncome));
+      case 4:
+        return localRiskTolerance !== null;
+      default:
+        return false;
+    }
+  };
+
+  const renderStep = () => {
+    switch (step) {
+      case 1:
+        return (
+          <Animated.View
+            style={[styles.stepContent, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}
+          >
+            <View style={styles.stepHeader}>
+              <Text style={styles.stepIcon}>01</Text>
+              <Text style={styles.stepTitle}>Personal Information</Text>
+              <Text style={styles.stepSubtitle}>Let's get to know you better</Text>
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>FULL NAME</Text>
+              <View style={styles.inputContainer}>
+                <TextInput
+                  style={styles.input}
+                  value={localFullName}
+                  onChangeText={setLocalFullName}
+                  placeholder="Enter your full name"
+                  placeholderTextColor={AIColors.textMuted}
+                  autoCapitalize="words"
+                />
+              </View>
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>EMAIL (OPTIONAL)</Text>
+              <View style={styles.inputContainer}>
+                <TextInput
+                  style={styles.input}
+                  value={localEmail}
+                  onChangeText={setLocalEmail}
+                  placeholder="Enter your email"
+                  placeholderTextColor={AIColors.textMuted}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                />
+              </View>
+            </View>
+          </Animated.View>
+        );
+
+      case 2:
+        return (
+          <Animated.View
+            style={[styles.stepContent, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}
+          >
+            <View style={styles.stepHeader}>
+              <Text style={styles.stepIcon}>02</Text>
+              <Text style={styles.stepTitle}>I am a...</Text>
+              <Text style={styles.stepSubtitle}>This helps us personalize your experience</Text>
+            </View>
+
+            <View style={styles.optionsContainer}>
+              {userTypes.map((item) => (
+                <TouchableOpacity
+                  key={item.type}
+                  style={[
+                    styles.optionCard,
+                    localUserType === item.type && styles.optionCardSelected,
+                  ]}
+                  onPress={() => setLocalUserType(item.type)}
+                  activeOpacity={0.8}
+                >
+                  <View style={[
+                    styles.optionIcon,
+                    localUserType === item.type && styles.optionIconSelected
+                  ]}>
+                    <Text style={styles.optionEmoji}>{item.icon}</Text>
+                  </View>
+                  <View style={styles.optionContent}>
+                    <Text style={[
+                      styles.optionTitle,
+                      localUserType === item.type && styles.optionTitleSelected
+                    ]}>
+                      {UserTypeLabels[item.type]}
+                    </Text>
+                    <Text style={styles.optionDescription}>{item.description}</Text>
+                  </View>
+                  <View style={[
+                    styles.radioOuter,
+                    localUserType === item.type && styles.radioOuterSelected
+                  ]}>
+                    {localUserType === item.type && <View style={styles.radioInner} />}
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </Animated.View>
+        );
+
+      case 3:
+        return (
+          <Animated.View
+            style={[styles.stepContent, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}
+          >
+            <View style={styles.stepHeader}>
+              <Text style={styles.stepIcon}>03</Text>
+              <Text style={styles.stepTitle}>Monthly Income</Text>
+              <Text style={styles.stepSubtitle}>Help us recommend budgets tailored to you</Text>
+            </View>
+
+            <View style={styles.incomeInputContainer}>
+              <View style={styles.currencyBadge}>
+                <Text style={styles.currencySymbol}>₹</Text>
+              </View>
+              <TextInput
+                style={styles.incomeInput}
+                value={localMonthlyIncome}
+                onChangeText={setLocalMonthlyIncome}
+                placeholder="0"
+                placeholderTextColor={AIColors.textMuted}
+                keyboardType="numeric"
+              />
+              <Text style={styles.incomeUnit}>/month</Text>
+            </View>
+
+            <View style={styles.incomeHints}>
+              {['25,000', '50,000', '1,00,000', '2,00,000'].map((amount) => (
+                <TouchableOpacity
+                  key={amount}
+                  style={styles.incomeHint}
+                  onPress={() => setLocalMonthlyIncome(amount.replace(/,/g, ''))}
+                >
+                  <Text style={styles.incomeHintText}>₹{amount}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </Animated.View>
+        );
+
+      case 4:
+        return (
+          <Animated.View
+            style={[styles.stepContent, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}
+          >
+            <View style={styles.stepHeader}>
+              <Text style={styles.stepIcon}>04</Text>
+              <Text style={styles.stepTitle}>Risk Tolerance</Text>
+              <Text style={styles.stepSubtitle}>How comfortable are you with investment risks?</Text>
+            </View>
+
+            <View style={styles.optionsContainer}>
+              {riskLevels.map((item) => (
+                <TouchableOpacity
+                  key={item.level}
+                  style={[
+                    styles.optionCard,
+                    localRiskTolerance === item.level && styles.optionCardSelected,
+                  ]}
+                  onPress={() => setLocalRiskTolerance(item.level)}
+                  activeOpacity={0.8}
+                >
+                  <View style={[
+                    styles.optionIcon,
+                    localRiskTolerance === item.level && styles.optionIconSelected
+                  ]}>
+                    <Text style={styles.optionEmoji}>{item.icon}</Text>
+                  </View>
+                  <View style={styles.optionContent}>
+                    <Text style={[
+                      styles.optionTitle,
+                      localRiskTolerance === item.level && styles.optionTitleSelected
+                    ]}>
+                      {RiskToleranceLabels[item.level]}
+                    </Text>
+                    <Text style={styles.optionDescription}>{item.description}</Text>
+                  </View>
+                  <View style={[
+                    styles.radioOuter,
+                    localRiskTolerance === item.level && styles.radioOuterSelected
+                  ]}>
+                    {localRiskTolerance === item.level && <View style={styles.radioInner} />}
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </Animated.View>
+        );
+    }
+  };
+
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Complete Your Profile</Text>
+    <View style={styles.container}>
+      {/* Background Grid */}
+      <View style={styles.gridPattern}>
+        {[...Array(15)].map((_, i) => (
+          <View key={`h-${i}`} style={[styles.gridLine, styles.gridHorizontal, { top: i * 60 }]} />
+        ))}
       </View>
 
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.content}
-      >
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="handled"
+      <SafeAreaView style={styles.safeArea}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.keyboardView}
         >
-          {/* Section Header */}
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionIcon}>👤</Text>
-            <View style={styles.sectionHeaderText}>
-              <Text style={styles.sectionTitle}>Personal Information</Text>
-              <Text style={styles.sectionSubtitle}>
-                Help us personalize your experience
+          {/* Header */}
+          <View style={styles.header}>
+            <View style={styles.headerTop}>
+              {step > 1 && (
+                <TouchableOpacity style={styles.backButton} onPress={handleBack}>
+                  <Text style={styles.backIcon}>←</Text>
+                </TouchableOpacity>
+              )}
+              <View style={styles.headerTitles}>
+                <Text style={styles.headerTitle}>Complete Your Profile</Text>
+                <Text style={styles.headerSubtitle}>Help us personalize your experience</Text>
+              </View>
+              <View style={styles.stepBadge}>
+                <Text style={styles.stepBadgeText}>{step}/{totalSteps}</Text>
+              </View>
+            </View>
+
+            <View style={styles.progressContainer}>
+              <ProgressBar progress={progress} color={AIColors.primary} height={4} />
+              <Text style={styles.progressLabel}>
+                {progress === 1 ? 'Complete!' : 'Almost there!'}
               </Text>
             </View>
           </View>
 
-          {/* Error Message */}
-          {profileError && (
-            <View style={styles.errorCard}>
-              <Text style={styles.errorCardText}>{profileError}</Text>
-            </View>
-          )}
-
-          {/* Full Name */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Full Name *</Text>
-            <TextInput
-              style={styles.textInput}
-              value={fullName}
-              onChangeText={updateFullName}
-              placeholder="Enter your full name"
-              placeholderTextColor={Colors.onSurfaceVariant}
-              editable={!isProfileSaving}
-            />
-          </View>
-
-          {/* Email */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Email (Optional)</Text>
-            <TextInput
-              style={styles.textInput}
-              value={email}
-              onChangeText={updateEmail}
-              placeholder="Enter your email"
-              placeholderTextColor={Colors.onSurfaceVariant}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              editable={!isProfileSaving}
-            />
-          </View>
-
-          {/* User Type Selection */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>I am a... *</Text>
-            {Object.values(UserType).map((type) => (
-              <TouchableOpacity
-                key={type}
-                style={styles.radioOption}
-                onPress={() => updateUserType(type)}
-                disabled={isProfileSaving}
-              >
-                <View
-                  style={[
-                    styles.radioCircle,
-                    selectedUserType === type && styles.radioCircleSelected,
-                  ]}
-                >
-                  {selectedUserType === type && (
-                    <View style={styles.radioInner} />
-                  )}
-                </View>
-                <Text style={styles.radioLabel}>{UserTypeLabels[type]}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          {/* Monthly Income */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Monthly Income *</Text>
-            <View style={styles.incomeInputContainer}>
-              <Text style={styles.currencySymbol}>₹</Text>
-              <TextInput
-                style={styles.incomeInput}
-                value={monthlyIncome}
-                onChangeText={updateMonthlyIncome}
-                placeholder="Enter amount"
-                placeholderTextColor={Colors.onSurfaceVariant}
-                keyboardType="numeric"
-                editable={!isProfileSaving}
-              />
-            </View>
-          </View>
-
-          {/* Risk Tolerance Selection */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Risk Tolerance *</Text>
-            <Text style={styles.inputHint}>
-              How comfortable are you with investment risk?
-            </Text>
-            {Object.values(RiskTolerance).map((risk) => (
-              <TouchableOpacity
-                key={risk}
-                style={styles.radioOption}
-                onPress={() => updateRiskTolerance(risk)}
-                disabled={isProfileSaving}
-              >
-                <View
-                  style={[
-                    styles.radioCircle,
-                    selectedRiskTolerance === risk && styles.radioCircleSelected,
-                  ]}
-                >
-                  {selectedRiskTolerance === risk && (
-                    <View style={styles.radioInner} />
-                  )}
-                </View>
-                <Text style={styles.radioLabel}>
-                  {RiskToleranceLabels[risk]}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          {/* Save Button */}
-          <TouchableOpacity
-            style={[styles.button, isProfileSaving && styles.buttonDisabled]}
-            onPress={handleSaveProfile}
-            disabled={isProfileSaving}
+          {/* Content */}
+          <ScrollView
+            style={styles.scrollView}
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
           >
-            {isProfileSaving ? (
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator color={Colors.onPrimary} size="small" />
-                <Text style={styles.buttonText}>Saving Profile...</Text>
+            {profileError && (
+              <View style={styles.errorContainer}>
+                <Text style={styles.errorIcon}>!</Text>
+                <Text style={styles.errorText}>{profileError}</Text>
               </View>
-            ) : (
-              <Text style={styles.buttonText}>Save & Continue</Text>
             )}
-          </TouchableOpacity>
 
-          <View style={styles.bottomPadding} />
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+            {renderStep()}
+          </ScrollView>
+
+          {/* Footer */}
+          <View style={styles.footer}>
+            <TouchableOpacity
+              style={[
+                styles.continueButton,
+                !canProceed() && styles.continueButtonDisabled,
+              ]}
+              onPress={handleNext}
+              disabled={!canProceed() || isProfileSaving}
+              activeOpacity={0.85}
+            >
+              {isProfileSaving ? (
+                <ActivityIndicator color={AIColors.background} size="small" />
+              ) : (
+                <>
+                  <Text style={styles.continueButtonText}>
+                    {step === totalSteps ? 'Get Started' : 'Continue'}
+                  </Text>
+                  <Text style={styles.continueButtonIcon}>→</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: AIColors.background,
   },
+  safeArea: {
+    flex: 1,
+  },
+  keyboardView: {
+    flex: 1,
+  },
+
+  // Grid Pattern
+  gridPattern: {
+    ...StyleSheet.absoluteFillObject,
+    overflow: 'hidden',
+  },
+  gridLine: {
+    position: 'absolute',
+    backgroundColor: AIColors.border,
+  },
+  gridHorizontal: {
+    left: 0,
+    right: 0,
+    height: 1,
+    opacity: 0.2,
+  },
+
+  // Header
   header: {
-    backgroundColor: Colors.primary,
-    paddingVertical: 16,
-    paddingHorizontal: 24,
+    paddingHorizontal: AISpacing.xl,
+    paddingTop: AISpacing.md,
+    paddingBottom: AISpacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: AIColors.border,
+  },
+  headerTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: AISpacing.lg,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: AIRadius.md,
+    backgroundColor: AIColors.surface,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: AISpacing.md,
+    borderWidth: 1,
+    borderColor: AIColors.border,
+  },
+  backIcon: {
+    fontSize: 20,
+    color: AIColors.text,
+  },
+  headerTitles: {
+    flex: 1,
   },
   headerTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: Colors.onPrimary,
+    ...AITypography.h2,
+    color: AIColors.text,
   },
-  content: {
+  headerSubtitle: {
+    ...AITypography.bodySmall,
+    color: AIColors.textSecondary,
+    marginTop: 2,
+  },
+  stepBadge: {
+    paddingHorizontal: AISpacing.md,
+    paddingVertical: AISpacing.xs,
+    backgroundColor: AIColors.primaryDim,
+    borderRadius: AIRadius.full,
+  },
+  stepBadgeText: {
+    ...AITypography.label,
+    color: AIColors.primary,
+  },
+  progressContainer: {
+    marginTop: AISpacing.sm,
+  },
+  progressLabel: {
+    ...AITypography.labelSmall,
+    color: AIColors.primary,
+    textAlign: 'right',
+    marginTop: AISpacing.xs,
+  },
+
+  // Content
+  scrollView: {
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 24,
-    paddingTop: 24,
+    paddingHorizontal: AISpacing.xl,
+    paddingVertical: AISpacing.xl,
   },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  sectionIcon: {
-    fontSize: 32,
-    marginRight: 12,
-  },
-  sectionHeaderText: {
+  stepContent: {
     flex: 1,
   },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: Colors.onSurface,
+  stepHeader: {
+    marginBottom: AISpacing.xl,
   },
-  sectionSubtitle: {
-    fontSize: 14,
-    color: Colors.onSurfaceVariant,
-    marginTop: 2,
+  stepIcon: {
+    fontSize: 32,
+    marginBottom: AISpacing.sm,
   },
-  errorCard: {
-    backgroundColor: Colors.errorContainer,
-    padding: 16,
-    borderRadius: 8,
-    marginBottom: 16,
+  stepTitle: {
+    ...AITypography.h1,
+    color: AIColors.text,
+    marginBottom: AISpacing.xs,
   },
-  errorCardText: {
-    color: Colors.error,
-    fontSize: 14,
+  stepSubtitle: {
+    ...AITypography.body,
+    color: AIColors.textSecondary,
   },
+
+  // Error
+  errorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: AIColors.errorDim,
+    padding: AISpacing.md,
+    borderRadius: AIRadius.lg,
+    marginBottom: AISpacing.lg,
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.3)',
+  },
+  errorIcon: {
+    fontSize: 16,
+    marginRight: AISpacing.sm,
+  },
+  errorText: {
+    ...AITypography.bodySmall,
+    color: AIColors.error,
+    flex: 1,
+  },
+
+  // Input
   inputGroup: {
-    marginBottom: 20,
+    marginBottom: AISpacing.lg,
   },
   inputLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: Colors.onSurface,
-    marginBottom: 8,
+    ...AITypography.label,
+    color: AIColors.textSecondary,
+    marginBottom: AISpacing.sm,
   },
-  inputHint: {
-    fontSize: 14,
-    color: Colors.onSurfaceVariant,
-    marginBottom: 8,
+  inputContainer: {
+    backgroundColor: AIColors.surface,
+    borderRadius: AIRadius.lg,
+    borderWidth: 1.5,
+    borderColor: AIColors.border,
+    paddingHorizontal: AISpacing.md,
   },
-  textInput: {
-    backgroundColor: Colors.surface,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: Colors.secondaryLight,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontSize: 16,
-    color: Colors.onSurface,
+  input: {
+    ...AITypography.bodyLarge,
+    color: AIColors.text,
+    paddingVertical: AISpacing.md,
   },
-  incomeInputContainer: {
+
+  // Options
+  optionsContainer: {
+    gap: AISpacing.sm,
+  },
+  optionCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.surface,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: Colors.secondaryLight,
+    backgroundColor: AIColors.surface,
+    borderRadius: AIRadius.lg,
+    padding: AISpacing.md,
+    borderWidth: 1.5,
+    borderColor: AIColors.border,
   },
-  currencySymbol: {
-    fontSize: 20,
-    color: Colors.onSurface,
-    paddingLeft: 16,
-    fontWeight: '500',
+  optionCardSelected: {
+    borderColor: AIColors.primary,
+    backgroundColor: AIColors.primaryDim,
   },
-  incomeInput: {
-    flex: 1,
-    paddingHorizontal: 8,
-    paddingVertical: 14,
-    fontSize: 16,
-    color: Colors.onSurface,
-  },
-  radioOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 10,
-  },
-  radioCircle: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    borderWidth: 2,
-    borderColor: Colors.secondaryLight,
+  optionIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: AIRadius.md,
+    backgroundColor: AIColors.surfaceLight,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: AISpacing.md,
   },
-  radioCircleSelected: {
-    borderColor: Colors.primary,
+  optionIconSelected: {
+    backgroundColor: AIColors.primaryDim,
+  },
+  optionEmoji: {
+    fontSize: 24,
+  },
+  optionContent: {
+    flex: 1,
+  },
+  optionTitle: {
+    ...AITypography.body,
+    color: AIColors.text,
+    fontWeight: '600',
+  },
+  optionTitleSelected: {
+    color: AIColors.primary,
+  },
+  optionDescription: {
+    ...AITypography.bodySmall,
+    color: AIColors.textSecondary,
+    marginTop: 2,
+  },
+  radioOuter: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: AIColors.border,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  radioOuterSelected: {
+    borderColor: AIColors.primary,
   },
   radioInner: {
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: Colors.primary,
+    backgroundColor: AIColors.primary,
   },
-  radioLabel: {
-    fontSize: 16,
-    color: Colors.onSurface,
-  },
-  button: {
-    backgroundColor: Colors.primary,
-    paddingVertical: 16,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  buttonDisabled: {
-    backgroundColor: Colors.primaryLight,
-    opacity: 0.7,
-  },
-  loadingContainer: {
+
+  // Income Input
+  incomeInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    backgroundColor: AIColors.surface,
+    borderRadius: AIRadius.xl,
+    borderWidth: 1.5,
+    borderColor: AIColors.border,
+    paddingHorizontal: AISpacing.md,
+    paddingVertical: AISpacing.sm,
   },
-  buttonText: {
-    color: Colors.onPrimary,
-    fontSize: 16,
+  currencyBadge: {
+    width: 40,
+    height: 40,
+    borderRadius: AIRadius.md,
+    backgroundColor: AIColors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: AISpacing.sm,
+  },
+  currencySymbol: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: AIColors.background,
+  },
+  incomeInput: {
+    flex: 1,
+    ...AITypography.displaySmall,
+    color: AIColors.text,
+    paddingVertical: AISpacing.sm,
+  },
+  incomeUnit: {
+    ...AITypography.body,
+    color: AIColors.textMuted,
+  },
+  incomeHints: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: AISpacing.sm,
+    marginTop: AISpacing.lg,
+  },
+  incomeHint: {
+    paddingHorizontal: AISpacing.md,
+    paddingVertical: AISpacing.sm,
+    backgroundColor: AIColors.surface,
+    borderRadius: AIRadius.full,
+    borderWidth: 1,
+    borderColor: AIColors.border,
+  },
+  incomeHintText: {
+    ...AITypography.bodySmall,
+    color: AIColors.textSecondary,
+  },
+
+  // Footer
+  footer: {
+    paddingHorizontal: AISpacing.xl,
+    paddingVertical: AISpacing.lg,
+    borderTopWidth: 1,
+    borderTopColor: AIColors.border,
+  },
+  continueButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: AIColors.primary,
+    paddingVertical: AISpacing.lg,
+    borderRadius: AIRadius.lg,
+    ...AIShadows.glow,
+  },
+  continueButtonDisabled: {
+    backgroundColor: AIColors.surface,
+    shadowOpacity: 0,
+  },
+  continueButtonText: {
+    ...AITypography.button,
+    color: AIColors.background,
     fontWeight: '600',
   },
-  bottomPadding: {
-    height: 40,
+  continueButtonIcon: {
+    fontSize: 18,
+    color: AIColors.background,
+    marginLeft: AISpacing.sm,
   },
 });

@@ -1,302 +1,474 @@
 /**
- * Phone Login Screen
- * Phone number entry for Firebase OTP authentication.
+ * Phone Login Screen - Futuristic AI Financial Platform
+ * Apple/Stripe inspired dark theme with glassmorphism
  */
 
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
-  ScrollView,
+  ActivityIndicator,
+  Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList, OtpState } from '../types';
 import { useAuthStore } from '../store/authStore';
-import { Colors } from '../theme/colors';
+import { AIColors, AISpacing, AIRadius, AIShadows, AITypography } from '../theme/aiTheme';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'PhoneLogin'>;
 };
 
 export default function PhoneLoginScreen({ navigation }: Props) {
-  const {
-    phoneNumber,
-    phoneError,
+  const { 
+    phoneNumber: storePhoneNumber,
+    updatePhoneNumber: setStorePhone,
+    sendOtp: sendOtpAction,
     otpState,
-    updatePhoneNumber,
-    sendOtp,
-    resetAuthState,
+    verificationId,
+    authError, 
+    phoneError,
+    clearError 
   } = useAuthStore();
+  const [phoneNumber, setPhoneNumber] = useState(storePhoneNumber);
+  const [isFocused, setIsFocused] = useState(false);
 
-  const isLoading = otpState === OtpState.SENDING;
+  const isOtpLoading = otpState === OtpState.SENDING;
 
-  React.useEffect(() => {
-    resetAuthState();
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(30)).current;
+  const glowAnim = useRef(new Animated.Value(0.3)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+      Animated.spring(slideAnim, {
+        toValue: 0,
+        tension: 80,
+        friction: 10,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    // Pulse animation
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(glowAnim, {
+          toValue: 0.8,
+          duration: 2000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(glowAnim, {
+          toValue: 0.3,
+          duration: 2000,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
   }, []);
 
+  useEffect(() => {
+    clearError();
+  }, []);
+
+  const formatPhoneNumber = (text: string) => {
+    const cleaned = text.replace(/\D/g, '');
+    setPhoneNumber(cleaned.slice(0, 10));
+    setStorePhone(cleaned.slice(0, 10));
+  };
+
   const handleSendOtp = async () => {
-    const success = await sendOtp();
-    if (success) {
-      navigation.navigate('OtpVerification');
+    if (phoneNumber.length !== 10) return;
+    
+    clearError();
+    const success = await sendOtpAction();
+    if (success && verificationId) {
+      navigation.navigate('OtpVerification', {
+        phoneNumber: `+91${phoneNumber}`,
+        verificationId: verificationId,
+      });
     }
   };
 
+  // Navigate when OTP is sent and we have verificationId
+  useEffect(() => {
+    if (otpState === OtpState.SENT && verificationId) {
+      navigation.navigate('OtpVerification', {
+        phoneNumber: `+91${phoneNumber}`,
+        verificationId: verificationId,
+      });
+    }
+  }, [otpState, verificationId]);
+
+  const displayError = phoneError || authError;
+
+  const isValid = phoneNumber.length === 10;
+
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      {/* reCAPTCHA container for web - invisible */}
-      <View nativeID="recaptcha-container" />
-      
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Text style={styles.backButtonText}>←</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Phone Login</Text>
+    <View style={styles.container}>
+      {/* Background Elements */}
+      <View style={styles.gridPattern}>
+        {[...Array(15)].map((_, i) => (
+          <View key={`h-${i}`} style={[styles.gridLine, styles.gridHorizontal, { top: i * 60 }]} />
+        ))}
       </View>
+      <Animated.View style={[styles.glowOrb, { opacity: glowAnim }]} />
 
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.content}
-      >
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="handled"
+      <SafeAreaView style={styles.safeArea}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.keyboardView}
         >
-          {/* Icon */}
-          <View style={styles.iconContainer}>
-            <Text style={styles.icon}>📱</Text>
+          {/* Header */}
+          <View style={styles.header}>
+            <TouchableOpacity 
+              style={styles.backButton} 
+              onPress={() => navigation.goBack()}
+            >
+              <Text style={styles.backIcon}>←</Text>
+            </TouchableOpacity>
           </View>
 
-          {/* Title */}
-          <Text style={styles.title}>Enter Phone Number</Text>
-          <Text style={styles.subtitle}>
-            We'll send you a 6-digit OTP for verification
-          </Text>
-
-          {/* Phone Input Section */}
-          <View style={styles.inputSection}>
-            <Text style={styles.inputLabel}>Mobile Number</Text>
-
-            <View style={[
-              styles.phoneInputContainer,
-              phoneError && styles.inputContainerError
-            ]}>
-              <View style={styles.countryCode}>
-                <Text style={styles.flag}>🇮🇳</Text>
-                <Text style={styles.countryCodeText}>+91</Text>
+          <Animated.View
+            style={[
+              styles.content,
+              {
+                opacity: fadeAnim,
+                transform: [{ translateY: slideAnim }],
+              },
+            ]}
+          >
+            {/* Icon and Title */}
+            <View style={styles.titleSection}>
+              <View style={styles.iconContainer}>
+                <Text style={styles.phoneIcon}>◎</Text>
               </View>
-              <TextInput
-                style={styles.phoneInput}
-                value={phoneNumber}
-                onChangeText={updatePhoneNumber}
-                placeholder="Enter 10-digit number"
-                placeholderTextColor={Colors.onSurfaceVariant}
-                keyboardType="phone-pad"
-                maxLength={10}
-                editable={!isLoading}
-                autoFocus
-              />
-            </View>
-
-            {phoneError && <Text style={styles.errorText}>{phoneError}</Text>}
-          </View>
-
-          {/* Test Mode Notice */}
-          <View style={styles.noticeCard}>
-            <Text style={styles.noticeIcon}>💡</Text>
-            <View style={styles.noticeContent}>
-              <Text style={styles.noticeTitle}>Test Mode</Text>
-              <Text style={styles.noticeText}>
-                For Expo Go: Use OTP "123456" to verify{'\n'}
-                Real SMS requires EAS development build
+              <Text style={styles.title}>Enter Your Phone</Text>
+              <Text style={styles.subtitle}>
+                We'll send you a verification code to confirm your identity
               </Text>
             </View>
-          </View>
 
-          {/* Send OTP Button */}
-          <TouchableOpacity
-            style={[
-              styles.button,
-              (phoneNumber.length !== 10 || isLoading) && styles.buttonDisabled,
-            ]}
-            onPress={handleSendOtp}
-            disabled={phoneNumber.length !== 10 || isLoading}
-          >
-            {isLoading ? (
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator color={Colors.onPrimary} size="small" />
-                <Text style={styles.buttonText}>Sending OTP...</Text>
+            {/* Phone Input */}
+            <View style={styles.inputSection}>
+              {displayError && (
+                <View style={styles.errorContainer}>
+                  <Text style={styles.errorIcon}>!</Text>
+                  <Text style={styles.errorText}>{displayError}</Text>
+                </View>
+              )}
+
+              <Text style={styles.inputLabel}>MOBILE NUMBER</Text>
+              <View style={[
+                styles.inputContainer,
+                isFocused && styles.inputContainerFocused,
+              ]}>
+                <View style={styles.countryCode}>
+                  <Text style={styles.flag}>🇮🇳</Text>
+                  <Text style={styles.countryCodeText}>+91</Text>
+                </View>
+                <View style={styles.inputDivider} />
+                <TextInput
+                  style={styles.input}
+                  value={phoneNumber}
+                  onChangeText={formatPhoneNumber}
+                  placeholder="9876543210"
+                  placeholderTextColor={AIColors.textMuted}
+                  keyboardType="phone-pad"
+                  maxLength={10}
+                  onFocus={() => setIsFocused(true)}
+                  onBlur={() => setIsFocused(false)}
+                />
+                {isValid && (
+                  <View style={styles.validBadge}>
+                    <Text style={styles.validIcon}>✓</Text>
+                  </View>
+                )}
               </View>
-            ) : (
-              <Text style={styles.buttonText}>Send OTP</Text>
-            )}
-          </TouchableOpacity>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+
+              <View style={styles.infoBox}>
+                <Text style={styles.infoIcon}>🔒</Text>
+                <Text style={styles.infoText}>
+                  Your number is secure and will only be used for verification
+                </Text>
+              </View>
+            </View>
+          </Animated.View>
+
+          {/* Footer */}
+          <View style={styles.footer}>
+            <TouchableOpacity
+              style={[
+                styles.continueButton,
+                !isValid && styles.continueButtonDisabled,
+              ]}
+              onPress={handleSendOtp}
+              disabled={!isValid || isOtpLoading}
+              activeOpacity={0.85}
+            >
+              {isOtpLoading ? (
+                <ActivityIndicator color={AIColors.background} size="small" />
+              ) : (
+                <>
+                  <Text style={[
+                    styles.continueButtonText,
+                    !isValid && styles.continueButtonTextDisabled,
+                  ]}>
+                    Send Verification Code
+                  </Text>
+                  <Text style={[
+                    styles.continueButtonIcon,
+                    !isValid && styles.continueButtonTextDisabled,
+                  ]}>→</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: AIColors.background,
   },
-  header: {
-    backgroundColor: Colors.primary,
-    paddingVertical: 16,
-    paddingHorizontal: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  backButton: {
-    padding: 8,
-    marginRight: 8,
-  },
-  backButtonText: {
-    fontSize: 20,
-    color: Colors.onPrimary,
-    fontWeight: 'bold',
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: Colors.onPrimary,
-  },
-  content: {
+  safeArea: {
     flex: 1,
   },
-  scrollContent: {
-    flexGrow: 1,
-    paddingHorizontal: 24,
-    paddingTop: 40,
+  keyboardView: {
+    flex: 1,
+  },
+
+  // Background
+  gridPattern: {
+    ...StyleSheet.absoluteFillObject,
+    overflow: 'hidden',
+  },
+  gridLine: {
+    position: 'absolute',
+    backgroundColor: AIColors.border,
+  },
+  gridHorizontal: {
+    left: 0,
+    right: 0,
+    height: 1,
+    opacity: 0.2,
+  },
+  glowOrb: {
+    position: 'absolute',
+    top: -100,
+    right: -100,
+    width: 300,
+    height: 300,
+    borderRadius: 150,
+    backgroundColor: AIColors.primary,
+    opacity: 0.1,
+  },
+
+  // Header
+  header: {
+    paddingHorizontal: AISpacing.xl,
+    paddingTop: AISpacing.md,
+  },
+  backButton: {
+    width: 44,
+    height: 44,
+    borderRadius: AIRadius.lg,
+    backgroundColor: AIColors.surface,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: AIColors.border,
+  },
+  backIcon: {
+    fontSize: 20,
+    color: AIColors.text,
+  },
+
+  // Content
+  content: {
+    flex: 1,
+    paddingHorizontal: AISpacing.xl,
+    paddingTop: AISpacing.xxl,
+  },
+
+  // Title Section
+  titleSection: {
+    alignItems: 'center',
+    marginBottom: AISpacing.xxl,
   },
   iconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: AIRadius.xl,
+    backgroundColor: AIColors.primaryDim,
+    justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: AISpacing.lg,
+    borderWidth: 1,
+    borderColor: AIColors.primary,
   },
-  icon: {
-    fontSize: 64,
+  phoneIcon: {
+    fontSize: 36,
   },
   title: {
-    fontSize: 26,
-    fontWeight: 'bold',
-    color: Colors.onSurface,
+    ...AITypography.h1,
+    color: AIColors.text,
+    marginBottom: AISpacing.sm,
     textAlign: 'center',
   },
   subtitle: {
-    fontSize: 15,
-    color: Colors.onSurfaceVariant,
+    ...AITypography.body,
+    color: AIColors.textSecondary,
     textAlign: 'center',
-    marginTop: 8,
-    lineHeight: 22,
+    paddingHorizontal: AISpacing.lg,
   },
+
+  // Input Section
   inputSection: {
-    marginTop: 32,
+    flex: 1,
   },
-  inputLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: Colors.onSurface,
-    marginBottom: 8,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  phoneInputContainer: {
+  errorContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.surface,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: Colors.secondaryLight,
+    backgroundColor: AIColors.errorDim,
+    padding: AISpacing.md,
+    borderRadius: AIRadius.lg,
+    marginBottom: AISpacing.lg,
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.3)',
   },
-  inputContainerError: {
-    borderColor: Colors.error,
+  errorIcon: {
+    fontSize: 16,
+    marginRight: AISpacing.sm,
+  },
+  errorText: {
+    ...AITypography.bodySmall,
+    color: AIColors.error,
+    flex: 1,
+  },
+  inputLabel: {
+    ...AITypography.label,
+    color: AIColors.textSecondary,
+    marginBottom: AISpacing.sm,
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: AIColors.surface,
+    borderRadius: AIRadius.xl,
+    borderWidth: 1.5,
+    borderColor: AIColors.border,
+    paddingHorizontal: AISpacing.md,
+    marginBottom: AISpacing.lg,
+  },
+  inputContainerFocused: {
+    borderColor: AIColors.primary,
+    backgroundColor: AIColors.surfaceLight,
   },
   countryCode: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    borderRightWidth: 1,
-    borderRightColor: Colors.secondaryLight,
-    gap: 8,
+    paddingRight: AISpacing.md,
   },
   flag: {
     fontSize: 20,
+    marginRight: AISpacing.xs,
   },
   countryCodeText: {
-    fontSize: 16,
-    color: Colors.onSurface,
+    ...AITypography.bodyLarge,
+    color: AIColors.text,
     fontWeight: '600',
   },
-  phoneInput: {
+  inputDivider: {
+    width: 1,
+    height: 24,
+    backgroundColor: AIColors.border,
+    marginRight: AISpacing.md,
+  },
+  input: {
     flex: 1,
-    paddingHorizontal: 16,
-    paddingVertical: 16,
+    ...AITypography.displaySmall,
+    color: AIColors.text,
+    paddingVertical: AISpacing.lg,
+    letterSpacing: 2,
+  },
+  validBadge: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: AIColors.primaryDim,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  validIcon: {
+    color: AIColors.primary,
+    fontWeight: '700',
+  },
+
+  infoBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: AIColors.surface,
+    padding: AISpacing.md,
+    borderRadius: AIRadius.lg,
+    borderWidth: 1,
+    borderColor: AIColors.border,
+  },
+  infoIcon: {
+    fontSize: 16,
+    marginRight: AISpacing.sm,
+  },
+  infoText: {
+    ...AITypography.bodySmall,
+    color: AIColors.textSecondary,
+    flex: 1,
+  },
+
+  // Footer
+  footer: {
+    paddingHorizontal: AISpacing.xl,
+    paddingVertical: AISpacing.lg,
+    borderTopWidth: 1,
+    borderTopColor: AIColors.border,
+  },
+  continueButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: AIColors.primary,
+    paddingVertical: AISpacing.lg,
+    borderRadius: AIRadius.lg,
+    ...AIShadows.glow,
+  },
+  continueButtonDisabled: {
+    backgroundColor: AIColors.surface,
+    shadowOpacity: 0,
+  },
+  continueButtonText: {
+    ...AITypography.button,
+    color: AIColors.background,
+    fontWeight: '600',
+  },
+  continueButtonTextDisabled: {
+    color: AIColors.textMuted,
+  },
+  continueButtonIcon: {
     fontSize: 18,
-    color: Colors.onSurface,
-    letterSpacing: 1,
-  },
-  errorText: {
-    color: Colors.error,
-    fontSize: 13,
-    marginTop: 8,
-  },
-  noticeCard: {
-    flexDirection: 'row',
-    backgroundColor: Colors.secondaryContainer,
-    borderRadius: 12,
-    padding: 14,
-    marginTop: 24,
-  },
-  noticeIcon: {
-    fontSize: 20,
-    marginRight: 12,
-  },
-  noticeContent: {
-    flex: 1,
-  },
-  noticeTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: Colors.onSecondaryContainer,
-    marginBottom: 4,
-  },
-  noticeText: {
-    fontSize: 12,
-    color: Colors.onSecondaryContainer,
-    lineHeight: 18,
-  },
-  button: {
-    backgroundColor: Colors.primary,
-    paddingVertical: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginTop: 32,
-  },
-  buttonDisabled: {
-    backgroundColor: Colors.primaryLight,
-    opacity: 0.6,
-  },
-  loadingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  buttonText: {
-    color: Colors.onPrimary,
-    fontSize: 16,
-    fontWeight: '600',
+    color: AIColors.background,
+    marginLeft: AISpacing.sm,
   },
 });

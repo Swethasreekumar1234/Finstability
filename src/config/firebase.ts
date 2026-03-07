@@ -203,10 +203,12 @@ export const getUserProfile = async (uid: string) => {
 };
 
 /**
- * Save user profile to Firestore
+ * Save user profile to Firestore with timeout
  */
 export const saveUserProfile = async (uid: string, profileData: any): Promise<boolean> => {
-  try {
+  const TIMEOUT_MS = 8000; // 8 second timeout
+  
+  const saveToFirestore = async () => {
     await setDoc(doc(db, 'users', uid), {
       ...profileData,
       uid,
@@ -214,9 +216,23 @@ export const saveUserProfile = async (uid: string, profileData: any): Promise<bo
       updatedAt: serverTimestamp(),
     });
     return true;
-  } catch (error) {
-    console.error('Error saving user profile:', error);
-    throw new Error('Failed to save profile');
+  };
+
+  const timeout = new Promise<never>((_, reject) => {
+    setTimeout(() => reject(new Error('Firestore timeout')), TIMEOUT_MS);
+  });
+
+  try {
+    // Race between Firestore save and timeout
+    await Promise.race([saveToFirestore(), timeout]);
+    console.log('Profile saved to Firestore');
+    return true;
+  } catch (error: any) {
+    console.warn('Firestore save failed or timed out:', error.message);
+    // Don't throw - just return true to allow navigation to continue
+    // Profile data is already in local state/AsyncStorage
+    console.log('Continuing with local storage only');
+    return true;
   }
 };
 

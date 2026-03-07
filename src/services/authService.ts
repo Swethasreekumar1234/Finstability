@@ -140,7 +140,7 @@ class AuthService {
         email: data[STORAGE_KEYS.EMAIL] || '',
         userType: (data[STORAGE_KEYS.USER_TYPE] as UserType) || UserType.STUDENT,
         monthlyIncome: parseFloat(data[STORAGE_KEYS.MONTHLY_INCOME] || '0'),
-        riskTolerance: (data[STORAGE_KEYS.RISK_TOLERANCE] as RiskTolerance) || RiskTolerance.MEDIUM,
+        riskTolerance: (data[STORAGE_KEYS.RISK_TOLERANCE] as RiskTolerance) || RiskTolerance.MODERATE,
         createdAt: parseInt(data[STORAGE_KEYS.CREATED_AT] || '0', 10),
       };
     } catch (error) {

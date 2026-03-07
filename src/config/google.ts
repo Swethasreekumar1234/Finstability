@@ -29,7 +29,6 @@ export const GOOGLE_CONFIG = {
 export const useGoogleAuth = () => {
   const redirectUri = makeRedirectUri({
     native: 'com.trishajanath.finstability://',
-    useProxy: true,
   });
 
   console.log('Redirect URI:', redirectUri);
