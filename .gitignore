@@ -25,6 +25,13 @@ package-lock.json
 .vscode/
 .idea/
 
+# Python (financial_advisor backend)
+.venv/
+venv/
+__pycache__/
+*.pyc
+scripts/financial_advisor/data/
+
 # Native builds (if ejected)
 ios/
 android/

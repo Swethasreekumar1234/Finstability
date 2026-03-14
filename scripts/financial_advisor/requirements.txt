@@ -1,0 +1,31 @@
+# ── Web scraping ────────────────────────────────────────────────────────────
+requests>=2.31.0
+beautifulsoup4>=4.12.0
+lxml>=4.9.0                  # fast HTML parser back-end for BeautifulSoup
+
+# ── NLP / Embeddings ─────────────────────────────────────────────────────────
+sentence-transformers>=2.7.0  # includes the "all-MiniLM-L6-v2" model
+# torch is a transitive dependency of sentence-transformers; it will be
+# installed automatically.  Pin the CPU-only build for smaller installs:
+# torch>=2.0.0+cpu            # uncomment if you want to pin explicitly
+
+# ── Vector store ─────────────────────────────────────────────────────────────
+faiss-cpu>=1.8.0
+numpy>=1.24.0
+
+# ── API ──────────────────────────────────────────────────────────────────────
+fastapi>=0.111.0
+uvicorn[standard]>=0.29.0    # includes websockets, httptools, watchfiles
+pydantic>=2.7.0
+
+# ── Scheduler ────────────────────────────────────────────────────────────────
+APScheduler>=3.10.0
+pytz>=2024.1                 # needed by APScheduler for timezone support
+
+# ── Utilities ────────────────────────────────────────────────────────────────
+python-dotenv>=1.0.1         # load OPENAI_API_KEY etc. from a .env file
+tqdm>=4.66.0                 # progress bars for embedding batches
+
+# ── Optional: LLM-enhanced recommendations ───────────────────────────────────
+# Uncomment to enable the GPT-based advisor path in rag/advisor.py:
+# openai>=1.30.0

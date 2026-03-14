@@ -127,4 +127,10 @@ export type RootStackParamList = {
   ProfileSetup: undefined;
   Dashboard: undefined;
   FinancialInput: undefined;
+  FinancialHealthScore: undefined;
+  FinancialProfile: undefined;
+  GovSchemes: undefined;
+  Tips: undefined;
+  RecommendedLoans: undefined;
+  InvestmentRecommendations: undefined;
 };

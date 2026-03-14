@@ -48,6 +48,53 @@ type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Dashboard'>;
 };
 
+type HubRoute =
+  | 'FinancialHealthScore'
+  | 'FinancialProfile'
+  | 'GovSchemes'
+  | 'Tips'
+  | 'RecommendedLoans'
+  | 'InvestmentRecommendations';
+
+const HUB_PAGES: Array<{ title: string; subtitle: string; icon: string; route: HubRoute }> = [
+  {
+    title: 'Financial Health Score',
+    subtitle: 'Breakdown of your score and next actions',
+    icon: '◉',
+    route: 'FinancialHealthScore',
+  },
+  {
+    title: 'Financial Profile',
+    subtitle: 'Income, goals, debt and risk summary',
+    icon: '▣',
+    route: 'FinancialProfile',
+  },
+  {
+    title: 'Government Schemes',
+    subtitle: 'Relevant Indian government programs',
+    icon: '◆',
+    route: 'GovSchemes',
+  },
+  {
+    title: 'Smart Tips',
+    subtitle: 'Daily improvements for financial stability',
+    icon: '✦',
+    route: 'Tips',
+  },
+  {
+    title: 'Recommended Loans',
+    subtitle: 'Loan types tailored to your profile',
+    icon: '◈',
+    route: 'RecommendedLoans',
+  },
+  {
+    title: 'Investment Recommendations',
+    subtitle: 'Diversified ideas aligned to risk level',
+    icon: '△',
+    route: 'InvestmentRecommendations',
+  },
+];
+
 export default function DashboardScreen({ navigation }: Props) {
   const { currentUser: user, isProfileSaving: isLoading, logout } = useAuthStore();
   const [financialProfile, setFinancialProfile] = useState<FinancialProfile | null>(null);
@@ -522,6 +569,29 @@ export default function DashboardScreen({ navigation }: Props) {
               </View>
             )}
 
+            <View style={styles.hubSection}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionIcon}>◫</Text>
+                <Text style={styles.sectionTitle}>Your Finance Hub</Text>
+              </View>
+              <Text style={styles.sectionSubtitle}>Open dedicated pages for deeper insights</Text>
+              <View style={styles.hubGrid}>
+                {HUB_PAGES.map((item) => (
+                  <TouchableOpacity
+                    key={item.route}
+                    style={styles.hubCard}
+                    activeOpacity={0.86}
+                    onPress={() => navigation.navigate(item.route)}
+                  >
+                    <Text style={styles.hubCardIcon}>{item.icon}</Text>
+                    <Text style={styles.hubCardTitle}>{item.title}</Text>
+                    <Text style={styles.hubCardSubtitle}>{item.subtitle}</Text>
+                    <Text style={styles.hubCardArrow}>Open →</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
             {/* Action Button */}
             <TouchableOpacity
               style={styles.actionButton}
@@ -922,6 +992,43 @@ const styles = StyleSheet.create({
   profileDivider: {
     height: 1,
     backgroundColor: AIColors.border,
+  },
+
+  hubSection: {
+    marginBottom: AISpacing.lg,
+  },
+  hubGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: AISpacing.sm,
+  },
+  hubCard: {
+    width: (width - AISpacing.lg * 2 - AISpacing.sm) / 2,
+    backgroundColor: AIColors.surface,
+    borderRadius: AIRadius.xl,
+    borderWidth: 1,
+    borderColor: AIColors.border,
+    padding: AISpacing.md,
+    minHeight: 156,
+  },
+  hubCardIcon: {
+    fontSize: 22,
+    color: AIColors.primary,
+    marginBottom: AISpacing.sm,
+  },
+  hubCardTitle: {
+    ...AITypography.h3,
+    color: AIColors.text,
+    marginBottom: AISpacing.xs,
+  },
+  hubCardSubtitle: {
+    ...AITypography.bodySmall,
+    color: AIColors.textSecondary,
+    marginBottom: AISpacing.md,
+  },
+  hubCardArrow: {
+    ...AITypography.label,
+    color: AIColors.primary,
   },
 
   // Action Button

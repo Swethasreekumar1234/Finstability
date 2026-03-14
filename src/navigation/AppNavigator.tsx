@@ -15,6 +15,12 @@ import {
   ProfileSetupScreen,
   DashboardScreen,
   FinancialInputScreen,
+  FinancialHealthScoreScreen,
+  FinancialProfileScreen,
+  GovSchemesScreen,
+  TipsScreen,
+  RecommendedLoansScreen,
+  InvestmentRecommendationsScreen,
 } from '../screens';
 import { useAuthStore } from '../store/authStore';
 import { AIColors, AITypography, AISpacing, AIRadius, AIShadows } from '../theme/aiTheme';
@@ -85,6 +91,12 @@ export default function AppNavigator() {
           component={FinancialInputScreen}
           options={{ animation: 'slide_from_bottom' }}
         />
+        <Stack.Screen name="FinancialHealthScore" component={FinancialHealthScoreScreen} />
+        <Stack.Screen name="FinancialProfile" component={FinancialProfileScreen} />
+        <Stack.Screen name="GovSchemes" component={GovSchemesScreen} />
+        <Stack.Screen name="Tips" component={TipsScreen} />
+        <Stack.Screen name="RecommendedLoans" component={RecommendedLoansScreen} />
+        <Stack.Screen name="InvestmentRecommendations" component={InvestmentRecommendationsScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );
