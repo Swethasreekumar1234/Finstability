@@ -1,322 +1,266 @@
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+/**
+ * Screen 1 - Finance Hub (Home Tab)
+ */
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet,
-  ScrollView, ActivityIndicator, Alert, Animated,
+  ActivityIndicator, Animated, Linking, ScrollView,
+  StyleSheet, Text, TouchableOpacity, View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { RootStackParamList, FinancialProfile, FinancialGoalLabels, FinancialGoalIcons } from '../types';
+import { RootStackParamList, FinancialProfile } from '../types';
 import { useAuthStore } from '../store/authStore';
-import { AIColors, AISpacing, AIRadius } from '../theme/aiTheme';
+import { AIColors, AISpacing, AIRadius, AIShadows } from '../theme/aiTheme';
 import { ProgressBar } from '../components/ai';
 import { getFinancialRecommendations } from '../services/recommendationEngine';
+import { apiService, SchemeRecommendation } from '../services/apiService';
 
-const FINANCIAL_PROFILE_KEY = 'financial_profile';
+const PROFILE_KEY = 'financial_profile';
 type StackNav = NativeStackNavigationProp<RootStackParamList>;
 
-function formatCurrency(n: number): string {
-  if (n >= 10000000) return '\u20B9' + (n / 10000000).toFixed(1) + 'Cr';
-  if (n >= 100000) return '\u20B9' + (n / 100000).toFixed(1) + 'L';
-  if (n >= 1000) return '\u20B9' + (n / 1000).toFixed(1) + 'K';
-  return '\u20B9' + n.toLocaleString();
+export function calculateHealthScore(p: FinancialProfile | null): number {
+  if (!p) return 0;
+  let s = 50;
+  const savRate = p.monthlyIncome > 0 ? (p.totalSavings / (p.monthlyIncome * 12)) * 100 : 0;
+  s += savRate >= 20 ? 15 : savRate >= 10 ? 10 : savRate / 2;
+  const dti = p.monthlyIncome > 0 ? p.existingLoans / p.monthlyIncome : 0;
+  s += dti <= 0.3 ? 15 : dti <= 0.5 ? 8 : -Math.min(20, (dti - 0.5) * 30);
+  s += (p.financialGoals?.length ?? 0) >= 3 ? 10 : (p.financialGoals?.length ?? 0) >= 1 ? 5 : 0;
+  s += (p.investmentExperience || 0) * 2;
+  return Math.max(0, Math.min(100, Math.round(s)));
 }
 
-export function calculateHealthScore(profile: FinancialProfile | null): number {
-  if (!profile) return 0;
-  let score = 50;
-  const savingsRate = profile.monthlyIncome > 0
-    ? (profile.totalSavings / (profile.monthlyIncome * 12)) * 100 : 0;
-  if (savingsRate >= 20) score += 15;
-  else if (savingsRate >= 10) score += 10;
-  else score += savingsRate / 2;
-  const dti = profile.monthlyIncome > 0 ? profile.existingLoans / profile.monthlyIncome : 0;
-  if (dti <= 0.3) score += 15;
-  else if (dti <= 0.5) score += 10;
-  else score -= (dti - 0.5) * 20;
-  if (profile.financialGoals.length >= 3) score += 10;
-  else if (profile.financialGoals.length >= 1) score += 5;
-  score += profile.investmentExperience * 2;
-  return Math.max(0, Math.min(100, Math.round(score)));
+function fmt(n: number): string {
+  if (n >= 10000000) return '\u20B9' + (n / 10000000).toFixed(1) + 'Cr';
+  if (n >= 100000)   return '\u20B9' + (n / 100000).toFixed(1) + 'L';
+  if (n >= 1000)     return '\u20B9' + (n / 1000).toFixed(1) + 'K';
+  return '\u20B9' + n.toLocaleString();
+}
+function scoreColor(s: number) {
+  return s >= 75 ? AIColors.primary : s >= 50 ? AIColors.warning : AIColors.error;
+}
+function catColor(cat: string): string {
+  const m: Record<string,string> = {
+    subsidy: '#F59E0B', pension: '#8B5CF6', insurance: '#3B82F6',
+    grant: '#10B981', loan_support: '#EF4444', scholarship: '#EC4899',
+  };
+  return m[cat] ?? AIColors.primary;
 }
 
 export default function DashboardScreen() {
-  const stackNav = useNavigation<StackNav>();
+  const nav = useNavigation<StackNav>();
   const { currentUser: user, logout } = useAuthStore();
   const [profile, setProfile] = useState<FinancialProfile | null>(null);
   const [loading, setLoading] = useState(true);
-  const [tipText, setTipText] = useState('');
-
+  const [schemes, setSchemes] = useState<SchemeRecommendation[]>([]);
+  const [tips, setTips] = useState<string[]>([]);
+  const [totalBenefits, setTotalBenefits] = useState(0);
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(24)).current;
+  const slideAnim = useRef(new Animated.Value(30)).current;
 
-  useFocusEffect(useCallback(() => {
-    loadProfile();
-  }, [user]));
-
+  useFocusEffect(useCallback(() => { loadData(); }, [user]));
   useEffect(() => {
     Animated.parallel([
-      Animated.timing(fadeAnim, { toValue: 1, duration: 500, useNativeDriver: true }),
-      Animated.spring(slideAnim, { toValue: 0, tension: 60, friction: 9, useNativeDriver: true }),
+      Animated.timing(fadeAnim, { toValue: 1, duration: 600, useNativeDriver: true }),
+      Animated.spring(slideAnim, { toValue: 0, tension: 55, friction: 9, useNativeDriver: true }),
     ]).start();
   }, []);
 
-  const loadProfile = async () => {
+  const loadData = async () => {
+    setLoading(true);
     try {
-      const data = await AsyncStorage.getItem(FINANCIAL_PROFILE_KEY);
-      if (data) {
-        const p: FinancialProfile = JSON.parse(data);
-        setProfile(p);
-        if (user) {
-          const recs = getFinancialRecommendations(
-            user.userType, p.monthlyIncome || user.monthlyIncome || 0,
-            p.riskTolerance || user.riskTolerance, p.financialGoals || [], p
-          );
-          if (recs.tips.length > 0) setTipText(recs.tips[0]);
-        }
+      const raw = await AsyncStorage.getItem(PROFILE_KEY);
+      const p: FinancialProfile | null = raw ? JSON.parse(raw) : null;
+      setProfile(p);
+      if (p && user) {
+        const recs = getFinancialRecommendations(user.userType, p.monthlyIncome, p.riskTolerance, p.financialGoals, p);
+        setTips(recs.tips.slice(0, 3));
+        try {
+          const resp = await apiService.recommendSchemes({
+            age: 28, gender: 'male', state: 'Delhi', occupation: 'salaried',
+            employment_type: (p.employmentType ?? 'FULL_TIME').toLowerCase(),
+            monthly_income: p.monthlyIncome, monthly_expenses: p.monthlyExpenses,
+            total_savings: p.totalSavings, total_debts: p.existingLoans, family_size: 3,
+          });
+          setSchemes(resp.schemes.slice(0, 3));
+          setTotalBenefits(resp.total_estimated_benefits);
+        } catch { setSchemes([]); }
       }
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   };
 
-  const handleSignOut = () =>
-    Alert.alert('Sign Out', 'Are you sure?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Sign Out', style: 'destructive',
-        onPress: async () => {
-          await logout();
-          stackNav.reset({ index: 0, routes: [{ name: 'Login' }] });
-        },
-      },
-    ]);
-
-  if (loading) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color={AIColors.primary} />
-      </View>
-    );
-  }
-
   const score = calculateHealthScore(profile);
-  const scoreColor = score >= 70 ? AIColors.success : score >= 40 ? AIColors.warning : AIColors.error;
-  const scoreLabel = score >= 70 ? 'Excellent' : score >= 40 ? 'Good' : 'Needs Work';
+  const h = new Date().getHours();
+  const greet = h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
+  const name = user?.displayName || user?.fullName || 'there';
 
-  const STAT_CARDS = [
-    { label: 'Monthly Income',   value: formatCurrency(profile?.monthlyIncome || user?.monthlyIncome || 0), color: AIColors.primary },
-    { label: 'Total Savings',    value: formatCurrency(profile?.totalSavings || 0),    color: AIColors.secondary },
-    { label: 'Monthly Expenses', value: formatCurrency(profile?.monthlyExpenses || 0), color: AIColors.warning },
-    { label: 'Existing Loans',   value: formatCurrency(profile?.existingLoans || 0),   color: AIColors.error },
-  ];
+  if (loading) return <View style={st.center}><ActivityIndicator size="large" color={AIColors.primary} /></View>;
 
   return (
-    <View style={styles.container}>
-      <SafeAreaView style={{ flex: 1 }}>
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
-          <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
-
-            <View style={styles.header}>
-              <View style={styles.headerLeft}>
-                <View style={styles.avatar}>
-                  <Text style={styles.avatarText}>
-                    {user?.displayName?.charAt(0)?.toUpperCase() || '?'}
-                  </Text>
-                  <View style={styles.onlineDot} />
-                </View>
-                <View>
-                  <Text style={styles.welcomeText}>Welcome back</Text>
-                  <Text style={styles.userName}>{user?.displayName || 'User'}</Text>
-                </View>
-              </View>
-              <TouchableOpacity onPress={handleSignOut} style={styles.signOutBtn}>
-                <Text style={styles.signOutIcon}>{'\u23FB'}</Text>
-              </TouchableOpacity>
+    <SafeAreaView style={st.safe}>
+      <ScrollView style={st.scroll} contentContainerStyle={st.content} showsVerticalScrollIndicator={false}>
+        <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
+          {/* Header */}
+          <View style={st.header}>
+            <View>
+              <Text style={st.greeting}>{greet},</Text>
+              <Text style={st.name}>{name}!</Text>
             </View>
-
-            <View style={styles.tipBanner}>
-              <View style={styles.tipBannerIcon}>
-                <Text style={{ color: AIColors.background, fontSize: 14 }}>{'\u25C6'}</Text>
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.tipBannerLabel}>{tipText ? 'AI INSIGHT' : 'GET STARTED'}</Text>
-                <Text style={styles.tipBannerText} numberOfLines={2}>
-                  {tipText || 'Complete your financial profile for personalized insights'}
+            <TouchableOpacity style={st.avatar} onPress={logout}>
+              <Text style={st.avatarTxt}>{(name[0] ?? 'U').toUpperCase()}</Text>
+            </TouchableOpacity>
+          </View>
+          {/* Notice */}
+          <View style={st.notice}>
+            <Text style={st.noticeTxt}>
+              This app helps you discover financial opportunities. Applications are processed on official external websites.
+            </Text>
+          </View>
+          {/* Health Score */}
+          <View style={[st.card, { borderColor: AIColors.borderGlow }]}>
+            <View style={st.scoreRow}>
+              <View>
+                <Text style={st.scoreLbl}>Financial Health Score</Text>
+                <Text style={[st.scoreNum, { color: scoreColor(score) }]}>
+                  {score}<Text style={st.scoreOf}>/100</Text>
                 </Text>
               </View>
-            </View>
-
-            <View style={styles.healthCard}>
-              <View style={styles.healthCardHeader}>
-                <Text style={styles.healthCardTitle}>Financial Health Score</Text>
-                <View style={[styles.scoreBadge, { backgroundColor: scoreColor + '22' }]}>
-                  <Text style={[styles.scoreBadgeText, { color: scoreColor }]}>{scoreLabel}</Text>
-                </View>
+              <View style={[st.ring, { borderColor: scoreColor(score) }]}>
+                <Text style={[st.ringNum, { color: scoreColor(score) }]}>{score}</Text>
               </View>
-              <View style={styles.scoreRow}>
-                <Text style={[styles.scoreNumber, { color: scoreColor }]}>{score}</Text>
-                <Text style={styles.scoreMax}>/100</Text>
-              </View>
-              <ProgressBar progress={score / 100} color={scoreColor} height={6} />
-              <Text style={styles.scoreCaption}>Based on income, savings, debt, and goals</Text>
             </View>
-
-            <View style={styles.statsGrid}>
-              {STAT_CARDS.map((s) => (
-                <View key={s.label} style={styles.statCard}>
-                  <Text style={styles.statLabel}>{s.label.toUpperCase()}</Text>
-                  <Text style={[styles.statValue, { color: s.color }]}>{s.value}</Text>
+            <View style={{ marginTop: AISpacing.md, marginBottom: AISpacing.sm }}>
+              <ProgressBar progress={score / 100} color={scoreColor(score)} />
+            </View>
+            <Text style={st.scoreTip}>
+              {score >= 75 ? 'Excellent! Keep it up.' : score >= 50 ? 'Good - boost savings to improve.' : 'Focus on reducing debt & saving more.'}
+            </Text>
+          </View>
+          {/* Stats */}
+          {profile && (
+            <View style={st.grid}>
+              {[
+                { lbl: 'Income',   val: fmt(profile.monthlyIncome),   c: AIColors.primary },
+                { lbl: 'Savings',  val: fmt(profile.totalSavings),    c: AIColors.success },
+                { lbl: 'Expenses', val: fmt(profile.monthlyExpenses), c: AIColors.warning },
+                { lbl: 'Loans',    val: fmt(profile.existingLoans),   c: AIColors.error   },
+              ].map((x) => (
+                <View key={x.lbl} style={st.statCard}>
+                  <Text style={[st.statVal, { color: x.c }]}>{x.val}</Text>
+                  <Text style={st.statLbl}>{x.lbl}</Text>
                 </View>
               ))}
             </View>
-
-            {profile?.financialGoals && profile.financialGoals.length > 0 && (
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Financial Goals</Text>
-                <View style={styles.goalsRow}>
-                  {profile.financialGoals.map((g) => (
-                    <View key={g} style={styles.goalPill}>
-                      <Text style={styles.goalPillText}>
-                        {FinancialGoalIcons[g]} {FinancialGoalLabels[g]}
+          )}
+          {/* Benefits banner */}
+          {totalBenefits > 0 && (
+            <View style={st.benefitBanner}>
+              <Text style={st.benefitLbl}>Estimated missing benefits</Text>
+              <Text style={st.benefitVal}>{fmt(totalBenefits)}/yr</Text>
+            </View>
+          )}
+          {/* Scheme previews */}
+          {schemes.length > 0 && (
+            <>
+              <Text style={st.section}>Recommended for You</Text>
+              {schemes.map((r) => (
+                <View key={r.scheme.scheme_id} style={st.schemeCard}>
+                  <View style={st.schemeTop}>
+                    <View style={[st.tag, { backgroundColor: catColor(r.scheme.category) + '22' }]}>
+                      <Text style={[st.tagTxt, { color: catColor(r.scheme.category) }]}>
+                        {r.scheme.category.replace('_',' ').toUpperCase()}
                       </Text>
                     </View>
-                  ))}
+                    {r.scheme.estimated_annual_benefit != null && (
+                      <Text style={st.schemeBen}>{fmt(r.scheme.estimated_annual_benefit)}/yr</Text>
+                    )}
+                  </View>
+                  <Text style={st.schemeName}>{r.scheme.scheme_name}</Text>
+                  <Text style={st.schemeDesc} numberOfLines={2}>{r.scheme.description}</Text>
+                  <TouchableOpacity style={st.applyBtn} onPress={() => Linking.openURL(r.scheme.application_link)}>
+                    <Text style={st.applyTxt}>Apply Now</Text>
+                  </TouchableOpacity>
                 </View>
-              </View>
-            )}
-
-            <TouchableOpacity style={styles.ctaBtn} onPress={() => stackNav.navigate('FinancialInput')}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.ctaBtnTitle}>Update Financial Profile</Text>
-                <Text style={styles.ctaBtnSub}>Keep your data current for better insights</Text>
-              </View>
-              <Text style={styles.ctaBtnArrow}>{'\u2192'}</Text>
-            </TouchableOpacity>
-
-            <View style={{ height: 24 }} />
-          </Animated.View>
-        </ScrollView>
-      </SafeAreaView>
-
-      {/* Floating AI Chat Button */}
-      <TouchableOpacity
-        style={styles.fabAI}
-        onPress={() => stackNav.navigate('AIChat')}
-        activeOpacity={0.85}
-      >
-        <Text style={styles.fabAIIcon}>✦</Text>
-        <Text style={styles.fabAILabel}>Ask Fin</Text>
-      </TouchableOpacity>
-    </View>
+              ))}
+            </>
+          )}
+          {/* Tips */}
+          {tips.length > 0 && (
+            <>
+              <Text style={st.section}>Financial Tips</Text>
+              {tips.map((tip, i) => (
+                <View key={i} style={st.tipCard}>
+                  <Text style={st.tipNum}>#{i + 1}</Text>
+                  <Text style={st.tipTxt}>{tip}</Text>
+                </View>
+              ))}
+            </>
+          )}
+          {/* Quick actions */}
+          <Text style={st.section}>Quick Actions</Text>
+          <View style={st.actions}>
+            {[
+              { icon: 'Edit', lbl: 'Update Profile',  fn: () => nav.navigate('FinancialInput') },
+              { icon: 'Tips', lbl: 'All Tips',         fn: () => nav.navigate('Tips') },
+              { icon: 'Invest', lbl: 'Investments',   fn: () => nav.navigate('InvestmentRecommendations') },
+            ].map((a) => (
+              <TouchableOpacity key={a.lbl} style={st.actionBtn} onPress={a.fn}>
+                <Text style={st.actionIcon}>{a.icon}</Text>
+                <Text style={st.actionLbl}>{a.lbl}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          <View style={{ height: 96 }} />
+        </Animated.View>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: AIColors.background },
+const st = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: AIColors.background },
+  scroll: { flex: 1 },
+  content: { padding: AISpacing.md },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: AIColors.background },
-  scroll: { paddingHorizontal: AISpacing.lg, paddingTop: AISpacing.md, paddingBottom: 96 },
-
-  header: {
-    flexDirection: 'row', alignItems: 'center',
-    justifyContent: 'space-between', marginBottom: AISpacing.lg,
-  },
-  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  avatar: {
-    width: 44, height: 44, borderRadius: 22,
-    backgroundColor: AIColors.primary, justifyContent: 'center', alignItems: 'center',
-  },
-  avatarText: { fontSize: 18, fontWeight: '700', color: AIColors.background },
-  onlineDot: {
-    position: 'absolute', bottom: 1, right: 1, width: 10, height: 10, borderRadius: 5,
-    backgroundColor: AIColors.success, borderWidth: 2, borderColor: AIColors.background,
-  },
-  welcomeText: { fontSize: 12, color: AIColors.textSecondary },
-  userName: { fontSize: 17, fontWeight: '700', color: AIColors.text },
-  signOutBtn: {
-    width: 38, height: 38, borderRadius: AIRadius.md,
-    backgroundColor: AIColors.surface,
-    justifyContent: 'center', alignItems: 'center',
-    borderWidth: 1, borderColor: AIColors.border,
-  },
-  signOutIcon: { fontSize: 18, color: AIColors.textMuted },
-
-  tipBanner: {
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: AIColors.primary + '15',
-    borderRadius: AIRadius.lg, padding: AISpacing.md,
-    borderWidth: 1, borderColor: AIColors.primary + '30',
-    marginBottom: AISpacing.md, gap: 10,
-  },
-  tipBannerIcon: {
-    width: 32, height: 32, borderRadius: AIRadius.md,
-    backgroundColor: AIColors.primary, justifyContent: 'center', alignItems: 'center',
-  },
-  tipBannerLabel: { fontSize: 11, color: AIColors.primary, fontWeight: '700', marginBottom: 2, letterSpacing: 0.5 },
-  tipBannerText: { fontSize: 13, color: AIColors.text, lineHeight: 18 },
-
-  healthCard: {
-    backgroundColor: AIColors.surface, borderRadius: AIRadius.xl,
-    padding: AISpacing.lg, borderWidth: 1, borderColor: AIColors.border, marginBottom: AISpacing.md,
-  },
-  healthCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  healthCardTitle: { fontSize: 16, fontWeight: '700', color: AIColors.text },
-  scoreBadge: { borderRadius: AIRadius.sm, paddingHorizontal: 8, paddingVertical: 3 },
-  scoreBadgeText: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase' },
-  scoreRow: { flexDirection: 'row', alignItems: 'baseline', marginBottom: 8 },
-  scoreNumber: { fontSize: 52, fontWeight: '800', lineHeight: 60 },
-  scoreMax: { fontSize: 16, color: AIColors.textSecondary, marginLeft: 4 },
-  scoreCaption: { fontSize: 12, color: AIColors.textSecondary, marginTop: 6 },
-
-  statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: AISpacing.md },
-  statCard: {
-    flex: 1, minWidth: '46%',
-    backgroundColor: AIColors.surface, borderRadius: AIRadius.lg,
-    padding: AISpacing.md, borderWidth: 1, borderColor: AIColors.border,
-  },
-  statLabel: { fontSize: 10, color: AIColors.textSecondary, letterSpacing: 0.5, marginBottom: 6 },
-  statValue: { fontSize: 20, fontWeight: '700' },
-
-  section: { marginBottom: AISpacing.md },
-  sectionTitle: { fontSize: 16, fontWeight: '700', color: AIColors.text, marginBottom: 10 },
-  goalsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  goalPill: {
-    backgroundColor: AIColors.surface, borderRadius: AIRadius.full,
-    paddingHorizontal: 12, paddingVertical: 6,
-    borderWidth: 1, borderColor: AIColors.border,
-  },
-  goalPillText: { fontSize: 12, color: AIColors.text },
-
-  ctaBtn: {
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: AIColors.primary, borderRadius: AIRadius.xl,
-    padding: AISpacing.md, gap: 10,
-  },
-  ctaBtnTitle: { fontSize: 15, fontWeight: '700', color: AIColors.background },
-  ctaBtnSub: { fontSize: 12, color: AIColors.background + 'CC', marginTop: 2 },
-  ctaBtnArrow: { fontSize: 20, color: AIColors.background, fontWeight: '700' },
-
-  fabAI: {
-    position: 'absolute',
-    bottom: 90,
-    right: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: AIColors.primary,
-    borderRadius: 30,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    shadowColor: AIColors.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.5,
-    shadowRadius: 12,
-    elevation: 8,
-  },
-  fabAIIcon: { fontSize: 16, color: AIColors.background },
-  fabAILabel: { fontSize: 14, fontWeight: '700', color: AIColors.background },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: AISpacing.md },
+  greeting: { fontSize: 13, color: AIColors.textSecondary },
+  name: { fontSize: 22, fontWeight: '700', color: AIColors.text, marginTop: 2 },
+  avatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: AIColors.primaryDim, justifyContent: 'center', alignItems: 'center', borderWidth: 1.5, borderColor: AIColors.primary },
+  avatarTxt: { fontSize: 18, fontWeight: '700', color: AIColors.primary },
+  notice: { backgroundColor: AIColors.secondaryDim, borderRadius: AIRadius.md, padding: AISpacing.sm, marginBottom: AISpacing.md, borderLeftWidth: 3, borderLeftColor: AIColors.secondary },
+  noticeTxt: { fontSize: 11, color: AIColors.textSecondary, lineHeight: 16 },
+  card: { backgroundColor: AIColors.surface, borderRadius: AIRadius.xl, padding: AISpacing.lg, marginBottom: AISpacing.md, borderWidth: 1, borderColor: AIColors.border, ...AIShadows.md },
+  scoreRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  scoreLbl: { fontSize: 12, color: AIColors.textSecondary, marginBottom: 4 },
+  scoreNum: { fontSize: 52, fontWeight: '800' },
+  scoreOf: { fontSize: 16, color: AIColors.textMuted, fontWeight: '400' },
+  ring: { width: 72, height: 72, borderRadius: 36, borderWidth: 5, justifyContent: 'center', alignItems: 'center' },
+  ringNum: { fontSize: 20, fontWeight: '700' },
+  scoreTip: { fontSize: 13, color: AIColors.textSecondary },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: AISpacing.sm, marginBottom: AISpacing.md },
+  statCard: { flex: 1, minWidth: '44%', backgroundColor: AIColors.surface, borderRadius: AIRadius.lg, padding: AISpacing.md, borderWidth: 1, borderColor: AIColors.border },
+  statVal: { fontSize: 18, fontWeight: '700', marginBottom: 4 },
+  statLbl: { fontSize: 11, color: AIColors.textSecondary },
+  benefitBanner: { backgroundColor: AIColors.primary + '1A', borderRadius: AIRadius.lg, padding: AISpacing.md, marginBottom: AISpacing.md, borderWidth: 1, borderColor: AIColors.primary + '40', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  benefitLbl: { fontSize: 13, color: AIColors.textSecondary, flex: 1 },
+  benefitVal: { fontSize: 20, fontWeight: '800', color: AIColors.primary },
+  section: { fontSize: 16, fontWeight: '700', color: AIColors.text, marginBottom: AISpacing.sm, marginTop: AISpacing.sm },
+  schemeCard: { backgroundColor: AIColors.surface, borderRadius: AIRadius.lg, padding: AISpacing.md, marginBottom: AISpacing.sm, borderWidth: 1, borderColor: AIColors.border },
+  schemeTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: AISpacing.sm },
+  tag: { paddingHorizontal: AISpacing.sm, paddingVertical: 3, borderRadius: AIRadius.sm },
+  tagTxt: { fontSize: 10, fontWeight: '700' },
+  schemeBen: { fontSize: 13, fontWeight: '700', color: AIColors.primary },
+  schemeName: { fontSize: 15, fontWeight: '700', color: AIColors.text, marginBottom: 4 },
+  schemeDesc: { fontSize: 12, color: AIColors.textSecondary, lineHeight: 18, marginBottom: AISpacing.sm },
+  applyBtn: { alignSelf: 'flex-start', backgroundColor: AIColors.primaryDim, paddingHorizontal: AISpacing.md, paddingVertical: 6, borderRadius: AIRadius.full, borderWidth: 1, borderColor: AIColors.primary },
+  applyTxt: { fontSize: 12, fontWeight: '700', color: AIColors.primary },
+  tipCard: { flexDirection: 'row', backgroundColor: AIColors.surface, borderRadius: AIRadius.md, padding: AISpacing.md, marginBottom: AISpacing.sm, borderWidth: 1, borderColor: AIColors.border, gap: AISpacing.sm },
+  tipNum: { fontSize: 18, fontWeight: '800', color: AIColors.primary },
+  tipTxt: { flex: 1, fontSize: 13, color: AIColors.textSecondary, lineHeight: 20 },
+  actions: { flexDirection: 'row', gap: AISpacing.sm, marginTop: AISpacing.sm },
+  actionBtn: { flex: 1, backgroundColor: AIColors.surface, borderRadius: AIRadius.lg, padding: AISpacing.md, alignItems: 'center', borderWidth: 1, borderColor: AIColors.border },
+  actionIcon: { fontSize: 13, marginBottom: 6, color: AIColors.primary, fontWeight: '700' },
+  actionLbl: { fontSize: 11, color: AIColors.textSecondary, textAlign: 'center' },
 });

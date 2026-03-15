@@ -1,973 +1,354 @@
 /**
- * Financial Input Screen - Futuristic AI Financial Platform
- * Apple/Stripe inspired dark theme with glassmorphism
+ * Financial Input Screen - compact 5-step form with sliders
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
-  View,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  StyleSheet,
-  ScrollView,
-  KeyboardAvoidingView,
-  Platform,
-  ActivityIndicator,
-  Animated,
-  Dimensions,
+  View,
 } from 'react-native';
+import Slider from '@react-native-community/slider';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
-  RootStackParamList,
-  FinancialProfile,
+  EmploymentType,
+  EmploymentTypeLabels,
   FinancialGoal,
   FinancialGoalLabels,
-  FinancialGoalIcons,
-  EmploymentType,
+  FinancialProfile,
   RiskTolerance,
   RiskToleranceLabels,
+  RootStackParamList,
 } from '../types';
-import { AIColors, AISpacing, AIRadius, AIShadows, AITypography } from '../theme/aiTheme';
-import { GlassCard, ProgressBar } from '../components/ai';
+import { AIColors, AIRadius, AISpacing, AIShadows } from '../theme/aiTheme';
 
-const { width } = Dimensions.get('window');
 const FINANCIAL_PROFILE_KEY = 'financial_profile';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'FinancialInput'>;
 };
 
-const employmentTypes = [
-  { type: EmploymentType.FULL_TIME, label: 'Full-Time', icon: '◇' },
-  { type: EmploymentType.PART_TIME, label: 'Part-Time', icon: '○' },
-  { type: EmploymentType.SELF_EMPLOYED, label: 'Self-Employed', icon: '△' },
-  { type: EmploymentType.FREELANCER, label: 'Freelancer', icon: '□' },
-  { type: EmploymentType.UNEMPLOYED, label: 'Not Working', icon: '▽' },
-  { type: EmploymentType.RETIRED, label: 'Retired', icon: '◎' },
+function money(n: number): string {
+  if (n >= 10000000) return '\\u20B9' + (n / 10000000).toFixed(1) + 'Cr';
+  if (n >= 100000) return '\\u20B9' + (n / 100000).toFixed(1) + 'L';
+  if (n >= 1000) return '\\u20B9' + (n / 1000).toFixed(1) + 'K';
+  return '\\u20B9' + n.toFixed(0);
+}
+
+const EMPLOYMENT_OPTIONS = [
+  EmploymentType.FULL_TIME,
+  EmploymentType.PART_TIME,
+  EmploymentType.SELF_EMPLOYED,
+  EmploymentType.FREELANCER,
+  EmploymentType.UNEMPLOYED,
+  EmploymentType.RETIRED,
 ];
 
-const financialGoals = Object.values(FinancialGoal);
+const RISK_OPTIONS = [RiskTolerance.LOW, RiskTolerance.MODERATE, RiskTolerance.HIGH];
+const GOAL_OPTIONS = Object.values(FinancialGoal);
 
 export default function FinancialInputScreen({ navigation }: Props) {
   const [step, setStep] = useState(1);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  
-  // Form state
-  const [monthlyIncome, setMonthlyIncome] = useState('');
-  const [existingLoans, setExistingLoans] = useState('');
-  const [totalSavings, setTotalSavings] = useState('');
-  const [monthlyExpenses, setMonthlyExpenses] = useState('');
-  const [selectedGoals, setSelectedGoals] = useState<FinancialGoal[]>([]);
-  const [riskTolerance, setRiskTolerance] = useState<RiskTolerance>(RiskTolerance.MODERATE);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  const [monthlyIncome, setMonthlyIncome] = useState('30000');
+  const [monthlyExpenses, setMonthlyExpenses] = useState('18000');
+  const [totalSavings, setTotalSavings] = useState('60000');
+  const [existingLoans, setExistingLoans] = useState('0');
   const [employmentType, setEmploymentType] = useState<EmploymentType>(EmploymentType.FULL_TIME);
-  const [investmentExperience, setInvestmentExperience] = useState(5);
-
-  // Animations
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(30)).current;
-
-  const totalSteps = 4;
-  const progress = step / totalSteps;
+  const [riskTolerance, setRiskTolerance] = useState<RiskTolerance>(RiskTolerance.MODERATE);
+  const [investmentExperience, setInvestmentExperience] = useState(4);
+  const [goals, setGoals] = useState<FinancialGoal[]>([]);
 
   useEffect(() => {
-    loadExistingProfile();
-    animateStep();
+    AsyncStorage.getItem(FINANCIAL_PROFILE_KEY)
+      .then((raw) => {
+        if (!raw) return;
+        const p: FinancialProfile = JSON.parse(raw);
+        setMonthlyIncome(String(p.monthlyIncome));
+        setMonthlyExpenses(String(p.monthlyExpenses));
+        setTotalSavings(String(p.totalSavings));
+        setExistingLoans(String(p.existingLoans));
+        setEmploymentType(p.employmentType);
+        setRiskTolerance(p.riskTolerance);
+        setInvestmentExperience(p.investmentExperience);
+        setGoals(p.financialGoals || []);
+      })
+      .finally(() => setLoading(false));
   }, []);
 
-  const animateStep = () => {
-    fadeAnim.setValue(0);
-    slideAnim.setValue(30);
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 400,
-        useNativeDriver: true,
-      }),
-      Animated.spring(slideAnim, {
-        toValue: 0,
-        tension: 80,
-        friction: 10,
-        useNativeDriver: true,
-      }),
-    ]).start();
+  const completion = useMemo(() => {
+    let done = 0;
+    if (Number(monthlyIncome) > 0) done += 1;
+    if (Number(monthlyExpenses) >= 0) done += 1;
+    if (Number(totalSavings) >= 0) done += 1;
+    if (goals.length > 0) done += 1;
+    if (investmentExperience >= 0) done += 1;
+    return done / 5;
+  }, [monthlyIncome, monthlyExpenses, totalSavings, goals.length, investmentExperience]);
+
+  const toggleGoal = (g: FinancialGoal) => {
+    setGoals((prev) => (prev.includes(g) ? prev.filter((x) => x !== g) : [...prev, g]));
   };
 
-  const loadExistingProfile = async () => {
+  const save = async () => {
+    if (Number(monthlyIncome) <= 0) {
+      Alert.alert('Missing income', 'Please enter a valid monthly income.');
+      return;
+    }
+
+    setSaving(true);
     try {
-      setIsLoading(true);
-      const data = await AsyncStorage.getItem(FINANCIAL_PROFILE_KEY);
-      if (data) {
-        const profile: FinancialProfile = JSON.parse(data);
-        setMonthlyIncome(profile.monthlyIncome?.toString() || '');
-        setExistingLoans(profile.existingLoans?.toString() || '');
-        setTotalSavings(profile.totalSavings?.toString() || '');
-        setMonthlyExpenses(profile.monthlyExpenses?.toString() || '');
-        setSelectedGoals(profile.financialGoals || []);
-        setRiskTolerance(profile.riskTolerance || RiskTolerance.MODERATE);
-        setEmploymentType(profile.employmentType || EmploymentType.FULL_TIME);
-        setInvestmentExperience(profile.investmentExperience || 5);
-      }
-    } catch (error) {
-      console.error('Error loading profile:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleNext = () => {
-    if (step < totalSteps) {
-      setStep(step + 1);
-      animateStep();
-    } else {
-      handleSave();
-    }
-  };
-
-  const handleBack = () => {
-    if (step > 1) {
-      setStep(step - 1);
-      animateStep();
-    } else {
-      navigation.goBack();
-    }
-  };
-
-  const handleSave = async () => {
-    try {
-      setIsSaving(true);
       const profile: FinancialProfile = {
-        monthlyIncome: parseFloat(monthlyIncome) || 0,
-        existingLoans: parseFloat(existingLoans) || 0,
-        totalSavings: parseFloat(totalSavings) || 0,
-        monthlyExpenses: parseFloat(monthlyExpenses) || 0,
-        financialGoals: selectedGoals,
-        riskTolerance,
+        monthlyIncome: Number(monthlyIncome) || 0,
+        monthlyExpenses: Number(monthlyExpenses) || 0,
+        totalSavings: Number(totalSavings) || 0,
+        existingLoans: Number(existingLoans) || 0,
         employmentType,
+        riskTolerance,
         investmentExperience,
+        financialGoals: goals,
         updatedAt: new Date().toISOString(),
       };
       await AsyncStorage.setItem(FINANCIAL_PROFILE_KEY, JSON.stringify(profile));
-      navigation.goBack();
-    } catch (error) {
-      console.error('Error saving profile:', error);
+      Alert.alert('Profile saved', 'Your financial profile has been updated.', [
+        { text: 'OK', onPress: () => navigation.goBack() },
+      ]);
+    } catch {
+      Alert.alert('Save failed', 'Could not save profile. Please try again.');
     } finally {
-      setIsSaving(false);
+      setSaving(false);
     }
   };
 
-  const toggleGoal = (goal: FinancialGoal) => {
-    setSelectedGoals(prev =>
-      prev.includes(goal)
-        ? prev.filter(g => g !== goal)
-        : [...prev, goal]
-    );
-  };
-
-  const canProceed = () => {
-    switch (step) {
-      case 1:
-        return monthlyIncome.trim().length > 0 && !isNaN(parseFloat(monthlyIncome));
-      case 2:
-        return true;
-      case 3:
-        return selectedGoals.length > 0;
-      case 4:
-        return true;
-      default:
-        return false;
-    }
-  };
-
-  const formatCurrency = (value: string) => {
-    const num = parseFloat(value);
-    if (isNaN(num)) return '₹0';
-    if (num >= 10000000) return `₹${(num / 10000000).toFixed(1)}Cr`;
-    if (num >= 100000) return `₹${(num / 100000).toFixed(1)}L`;
-    if (num >= 1000) return `₹${(num / 1000).toFixed(1)}K`;
-    return `₹${num.toLocaleString()}`;
-  };
-
-  const renderCurrencyInput = (
-    label: string,
-    value: string,
-    onChange: (text: string) => void,
-    placeholder: string,
-    icon: string
-  ) => (
-    <View style={styles.inputGroup}>
-      <Text style={styles.inputLabel}>{label}</Text>
-      <View style={styles.currencyInputContainer}>
-        <View style={styles.currencyIcon}>
-          <Text style={styles.currencyEmoji}>{icon}</Text>
-        </View>
-        <View style={styles.currencyBadge}>
-          <Text style={styles.currencySymbol}>₹</Text>
-        </View>
-        <TextInput
-          style={styles.currencyInput}
-          value={value}
-          onChangeText={(text) => onChange(text.replace(/[^0-9]/g, ''))}
-          placeholder={placeholder}
-          placeholderTextColor={AIColors.textMuted}
-          keyboardType="numeric"
-        />
-        {value && (
-          <Text style={styles.formattedValue}>{formatCurrency(value)}</Text>
-        )}
-      </View>
-    </View>
-  );
-
-  const renderStep = () => {
-    switch (step) {
-      case 1:
-        return (
-          <Animated.View style={[styles.stepContent, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
-            <View style={styles.stepHeader}>
-              <Text style={styles.stepIcon}>01</Text>
-              <Text style={styles.stepTitle}>Income & Assets</Text>
-              <Text style={styles.stepSubtitle}>Tell us about your financial inflow</Text>
-            </View>
-
-            {renderCurrencyInput(
-              'MONTHLY INCOME',
-              monthlyIncome,
-              setMonthlyIncome,
-              '50000',
-              '◇'
-            )}
-
-            {renderCurrencyInput(
-              'TOTAL SAVINGS',
-              totalSavings,
-              setTotalSavings,
-              '100000',
-              '□'
-            )}
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>EMPLOYMENT TYPE</Text>
-              <View style={styles.employmentGrid}>
-                {employmentTypes.map((item) => (
-                  <TouchableOpacity
-                    key={item.type}
-                    style={[
-                      styles.employmentChip,
-                      employmentType === item.type && styles.employmentChipSelected,
-                    ]}
-                    onPress={() => setEmploymentType(item.type)}
-                  >
-                    <Text style={styles.employmentIcon}>{item.icon}</Text>
-                    <Text style={[
-                      styles.employmentLabel,
-                      employmentType === item.type && styles.employmentLabelSelected,
-                    ]}>
-                      {item.label}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-          </Animated.View>
-        );
-
-      case 2:
-        return (
-          <Animated.View style={[styles.stepContent, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
-            <View style={styles.stepHeader}>
-              <Text style={styles.stepIcon}>02</Text>
-              <Text style={styles.stepTitle}>Expenses & Liabilities</Text>
-              <Text style={styles.stepSubtitle}>Help us understand your obligations</Text>
-            </View>
-
-            {renderCurrencyInput(
-              'MONTHLY EXPENSES',
-              monthlyExpenses,
-              setMonthlyExpenses,
-              '30000',
-              '○'
-            )}
-
-            {renderCurrencyInput(
-              'EXISTING LOANS',
-              existingLoans,
-              setExistingLoans,
-              '0',
-              '▽'
-            )}
-
-            <GlassCard style={styles.summaryCard}>
-              <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Net Monthly Savings</Text>
-                <Text style={[
-                  styles.summaryValue,
-                  { color: (parseFloat(monthlyIncome) || 0) - (parseFloat(monthlyExpenses) || 0) >= 0 
-                    ? AIColors.success 
-                    : AIColors.error 
-                  }
-                ]}>
-                  {formatCurrency(String((parseFloat(monthlyIncome) || 0) - (parseFloat(monthlyExpenses) || 0)))}
-                </Text>
-              </View>
-              <View style={styles.summaryDivider} />
-              <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Savings Rate</Text>
-                <Text style={styles.summaryValue}>
-                  {monthlyIncome && parseFloat(monthlyIncome) > 0
-                    ? `${(((parseFloat(monthlyIncome) - (parseFloat(monthlyExpenses) || 0)) / parseFloat(monthlyIncome)) * 100).toFixed(0)}%`
-                    : '0%'
-                  }
-                </Text>
-              </View>
-            </GlassCard>
-          </Animated.View>
-        );
-
-      case 3:
-        return (
-          <Animated.View style={[styles.stepContent, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
-            <View style={styles.stepHeader}>
-              <Text style={styles.stepIcon}>03</Text>
-              <Text style={styles.stepTitle}>Financial Goals</Text>
-              <Text style={styles.stepSubtitle}>What are you saving for? (Select all that apply)</Text>
-            </View>
-
-            <View style={styles.goalsGrid}>
-              {financialGoals.map((goal) => (
-                <TouchableOpacity
-                  key={goal}
-                  style={[
-                    styles.goalCard,
-                    selectedGoals.includes(goal) && styles.goalCardSelected,
-                  ]}
-                  onPress={() => toggleGoal(goal)}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.goalIcon}>{FinancialGoalIcons[goal]}</Text>
-                  <Text style={[
-                    styles.goalLabel,
-                    selectedGoals.includes(goal) && styles.goalLabelSelected,
-                  ]}>
-                    {FinancialGoalLabels[goal]}
-                  </Text>
-                  {selectedGoals.includes(goal) && (
-                    <View style={styles.goalCheck}>
-                      <Text style={styles.goalCheckIcon}>✓</Text>
-                    </View>
-                  )}
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            <Text style={styles.selectedCount}>
-              {selectedGoals.length} goal{selectedGoals.length !== 1 ? 's' : ''} selected
-            </Text>
-          </Animated.View>
-        );
-
-      case 4:
-        return (
-          <Animated.View style={[styles.stepContent, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
-            <View style={styles.stepHeader}>
-              <Text style={styles.stepIcon}>04</Text>
-              <Text style={styles.stepTitle}>Risk & Experience</Text>
-              <Text style={styles.stepSubtitle}>How do you approach investments?</Text>
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>RISK TOLERANCE</Text>
-              <View style={styles.riskOptions}>
-                {[RiskTolerance.LOW, RiskTolerance.MODERATE, RiskTolerance.HIGH].map((level) => (
-                  <TouchableOpacity
-                    key={level}
-                    style={[
-                      styles.riskOption,
-                      riskTolerance === level && styles.riskOptionSelected,
-                    ]}
-                    onPress={() => setRiskTolerance(level)}
-                  >
-                    <Text style={[
-                      styles.riskOptionIcon,
-                      riskTolerance === level && styles.riskOptionIconSelected,
-                    ]}>
-                      {level === RiskTolerance.LOW ? '—' : level === RiskTolerance.MODERATE ? '≡' : '↑'}
-                    </Text>
-                    <Text style={[
-                      styles.riskOptionLabel,
-                      riskTolerance === level && styles.riskOptionLabelSelected,
-                    ]}>
-                      {RiskToleranceLabels[level]}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-
-            <View style={styles.inputGroup}>
-              <View style={styles.sliderHeader}>
-                <Text style={styles.inputLabel}>INVESTMENT EXPERIENCE</Text>
-                <Text style={styles.experienceValue}>{investmentExperience}/10</Text>
-              </View>
-              <View style={styles.experienceScale}>
-                {[...Array(10)].map((_, i) => (
-                  <TouchableOpacity
-                    key={i}
-                    style={[
-                      styles.experienceDot,
-                      i < investmentExperience && styles.experienceDotActive,
-                    ]}
-                    onPress={() => setInvestmentExperience(i + 1)}
-                  />
-                ))}
-              </View>
-              <View style={styles.experienceLabels}>
-                <Text style={styles.experienceLabelText}>Beginner</Text>
-                <Text style={styles.experienceLabelText}>Expert</Text>
-              </View>
-            </View>
-
-            <GlassCard variant="glow" style={styles.finalSummary}>
-              <Text style={styles.finalSummaryTitle}>📋 Profile Summary</Text>
-              <View style={styles.finalSummaryGrid}>
-                <View style={styles.finalSummaryItem}>
-                  <Text style={styles.finalSummaryLabel}>Income</Text>
-                  <Text style={styles.finalSummaryValue}>{formatCurrency(monthlyIncome)}/mo</Text>
-                </View>
-                <View style={styles.finalSummaryItem}>
-                  <Text style={styles.finalSummaryLabel}>Savings</Text>
-                  <Text style={styles.finalSummaryValue}>{formatCurrency(totalSavings)}</Text>
-                </View>
-                <View style={styles.finalSummaryItem}>
-                  <Text style={styles.finalSummaryLabel}>Goals</Text>
-                  <Text style={styles.finalSummaryValue}>{selectedGoals.length}</Text>
-                </View>
-                <View style={styles.finalSummaryItem}>
-                  <Text style={styles.finalSummaryLabel}>Risk</Text>
-                  <Text style={styles.finalSummaryValue}>{RiskToleranceLabels[riskTolerance]}</Text>
-                </View>
-              </View>
-            </GlassCard>
-          </Animated.View>
-        );
-    }
-  };
-
-  if (isLoading) {
+  if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={AIColors.primary} />
-        <Text style={styles.loadingText}>Loading your profile...</Text>
-      </View>
+      <SafeAreaView style={styles.safe}>
+        <View style={styles.center}><Text style={styles.loadingText}>Loading profile...</Text></View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <View style={styles.container}>
-      {/* Background Grid */}
-      <View style={styles.gridPattern}>
-        {[...Array(15)].map((_, i) => (
-          <View key={`h-${i}`} style={[styles.gridLine, styles.gridHorizontal, { top: i * 60 }]} />
-        ))}
-      </View>
+    <SafeAreaView style={styles.safe}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+          <Text style={styles.title}>Update Financial Profile</Text>
+          <Text style={styles.subtitle}>Complete these 5 sections for better recommendations.</Text>
 
-      <SafeAreaView style={styles.safeArea}>
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.keyboardView}
-        >
-          {/* Header */}
-          <View style={styles.header}>
-            <View style={styles.headerTop}>
-              <TouchableOpacity style={styles.backButton} onPress={handleBack}>
-                <Text style={styles.backIcon}>←</Text>
+          <View style={styles.progressTrack}><View style={[styles.progressFill, { width: `${Math.round(completion * 100)}%` }]} /></View>
+          <Text style={styles.progressText}>{Math.round(completion * 100)}% complete</Text>
+
+          <View style={styles.stepRow}>
+            {[1, 2, 3, 4, 5].map((s) => (
+              <TouchableOpacity key={s} style={[styles.stepPill, step === s && styles.stepPillActive]} onPress={() => setStep(s)}>
+                <Text style={[styles.stepText, step === s && styles.stepTextActive]}>{s}</Text>
               </TouchableOpacity>
-              <View style={styles.headerTitles}>
-                <Text style={styles.headerTitle}>Financial Profile</Text>
-                <Text style={styles.headerSubtitle}>AI-powered analysis</Text>
-              </View>
-              <View style={styles.stepBadge}>
-                <Text style={styles.stepBadgeText}>{step}/{totalSteps}</Text>
-              </View>
-            </View>
-
-            <View style={styles.progressContainer}>
-              <ProgressBar progress={progress} color={AIColors.primary} height={4} />
-            </View>
+            ))}
           </View>
 
-          {/* Content */}
-          <ScrollView
-            style={styles.scrollView}
-            contentContainerStyle={styles.scrollContent}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-          >
-            {renderStep()}
-          </ScrollView>
+          {step === 1 && (
+            <View style={styles.card}>
+              <Text style={styles.sectionTitle}>Income & Expenses</Text>
+              <Text style={styles.inputLabel}>Monthly Income</Text>
+              <TextInput value={monthlyIncome} onChangeText={setMonthlyIncome} keyboardType="numeric" style={styles.input} placeholder="30000" placeholderTextColor={AIColors.textMuted} />
+              <Text style={styles.inputLabel}>Monthly Expenses</Text>
+              <TextInput value={monthlyExpenses} onChangeText={setMonthlyExpenses} keyboardType="numeric" style={styles.input} placeholder="18000" placeholderTextColor={AIColors.textMuted} />
+              <Text style={styles.helper}>Current surplus: {money((Number(monthlyIncome) || 0) - (Number(monthlyExpenses) || 0))}</Text>
+            </View>
+          )}
 
-          {/* Footer */}
-          <View style={styles.footer}>
+          {step === 2 && (
+            <View style={styles.card}>
+              <Text style={styles.sectionTitle}>Assets & Liabilities</Text>
+              <Text style={styles.inputLabel}>Total Savings</Text>
+              <TextInput value={totalSavings} onChangeText={setTotalSavings} keyboardType="numeric" style={styles.input} placeholder="60000" placeholderTextColor={AIColors.textMuted} />
+              <Text style={styles.inputLabel}>Existing Loans</Text>
+              <TextInput value={existingLoans} onChangeText={setExistingLoans} keyboardType="numeric" style={styles.input} placeholder="0" placeholderTextColor={AIColors.textMuted} />
+            </View>
+          )}
+
+          {step === 3 && (
+            <View style={styles.card}>
+              <Text style={styles.sectionTitle}>Employment & Risk</Text>
+              <Text style={styles.inputLabel}>Employment Type</Text>
+              <View style={styles.wrap}>
+                {EMPLOYMENT_OPTIONS.map((t) => (
+                  <TouchableOpacity
+                    key={t}
+                    style={[styles.chip, employmentType === t && styles.chipActive]}
+                    onPress={() => setEmploymentType(t)}
+                  >
+                    <Text style={[styles.chipText, employmentType === t && styles.chipTextActive]}>{EmploymentTypeLabels[t]}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <Text style={styles.inputLabel}>Risk Tolerance</Text>
+              <View style={styles.wrap}>
+                {RISK_OPTIONS.map((r) => (
+                  <TouchableOpacity key={r} style={[styles.chip, riskTolerance === r && styles.chipActive]} onPress={() => setRiskTolerance(r)}>
+                    <Text style={[styles.chipText, riskTolerance === r && styles.chipTextActive]}>{RiskToleranceLabels[r]}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          )}
+
+          {step === 4 && (
+            <View style={styles.card}>
+              <Text style={styles.sectionTitle}>Financial Goals</Text>
+              <View style={styles.wrap}>
+                {GOAL_OPTIONS.map((g) => (
+                  <TouchableOpacity key={g} style={[styles.chip, goals.includes(g) && styles.chipActive]} onPress={() => toggleGoal(g)}>
+                    <Text style={[styles.chipText, goals.includes(g) && styles.chipTextActive]}>{FinancialGoalLabels[g]}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <Text style={styles.helper}>{goals.length} goal(s) selected</Text>
+            </View>
+          )}
+
+          {step === 5 && (
+            <View style={styles.card}>
+              <Text style={styles.sectionTitle}>Investment Experience</Text>
+              <Text style={styles.sliderValue}>{investmentExperience}/10</Text>
+              <Slider
+                style={{ width: '100%', height: 40 }}
+                minimumValue={0}
+                maximumValue={10}
+                step={1}
+                minimumTrackTintColor={AIColors.primary}
+                maximumTrackTintColor={AIColors.border}
+                thumbTintColor={AIColors.primary}
+                value={investmentExperience}
+                onValueChange={(v) => setInvestmentExperience(v)}
+              />
+              <Text style={styles.helper}>Higher values indicate more comfort with volatility and complex products.</Text>
+            </View>
+          )}
+
+          <View style={styles.navRow}>
             <TouchableOpacity
-              style={[
-                styles.continueButton,
-                !canProceed() && styles.continueButtonDisabled,
-              ]}
-              onPress={handleNext}
-              disabled={!canProceed() || isSaving}
-              activeOpacity={0.85}
+              style={[styles.secondaryBtn, step === 1 && styles.btnDisabled]}
+              onPress={() => setStep((s) => Math.max(1, s - 1))}
+              disabled={step === 1}
             >
-              {isSaving ? (
-                <ActivityIndicator color={AIColors.background} size="small" />
-              ) : (
-                <>
-                  <Text style={[
-                    styles.continueButtonText,
-                    !canProceed() && styles.continueButtonTextDisabled
-                  ]}>
-                    {step === totalSteps ? 'Save Profile' : 'Continue'}
-                  </Text>
-                  <Text style={[
-                    styles.continueButtonIcon,
-                    !canProceed() && styles.continueButtonTextDisabled
-                  ]}>→</Text>
-                </>
-              )}
+              <Text style={styles.secondaryText}>Back</Text>
             </TouchableOpacity>
+
+            {step < 5 ? (
+              <TouchableOpacity style={styles.primaryBtn} onPress={() => setStep((s) => Math.min(5, s + 1))}>
+                <Text style={styles.primaryText}>Next</Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity style={[styles.primaryBtn, saving && styles.btnDisabled]} onPress={save} disabled={saving}>
+                <Text style={styles.primaryText}>{saving ? 'Saving...' : 'Save Profile'}</Text>
+              </TouchableOpacity>
+            )}
           </View>
-        </KeyboardAvoidingView>
-      </SafeAreaView>
-    </View>
+
+          <View style={{ height: 72 }} />
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: AIColors.background,
-  },
-  safeArea: {
-    flex: 1,
-  },
-  keyboardView: {
-    flex: 1,
-  },
-
-  // Background
-  gridPattern: {
-    ...StyleSheet.absoluteFillObject,
+  safe: { flex: 1, backgroundColor: AIColors.background },
+  content: { padding: AISpacing.md },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  loadingText: { color: AIColors.textSecondary, fontSize: 14 },
+  title: { fontSize: 28, fontWeight: '900', color: AIColors.text, marginBottom: 4 },
+  subtitle: { fontSize: 13, color: AIColors.textSecondary, marginBottom: AISpacing.md },
+  progressTrack: {
+    height: 8,
+    borderRadius: 999,
+    backgroundColor: AIColors.backgroundSecondary,
     overflow: 'hidden',
+    marginBottom: 6,
   },
-  gridLine: {
-    position: 'absolute',
-    backgroundColor: AIColors.border,
-  },
-  gridHorizontal: {
-    left: 0,
-    right: 0,
-    height: 1,
-    opacity: 0.2,
-  },
-
-  // Loading
-  loadingContainer: {
-    flex: 1,
+  progressFill: { height: 8, borderRadius: 999, backgroundColor: AIColors.primary },
+  progressText: { fontSize: 11, color: AIColors.textMuted, marginBottom: AISpacing.sm },
+  stepRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: AISpacing.md },
+  stepPill: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
     justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: AIColors.background,
-  },
-  loadingText: {
-    ...AITypography.body,
-    color: AIColors.textSecondary,
-    marginTop: AISpacing.md,
-  },
-
-  // Header
-  header: {
-    paddingHorizontal: AISpacing.xl,
-    paddingTop: AISpacing.md,
-    paddingBottom: AISpacing.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: AIColors.border,
-  },
-  headerTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: AISpacing.lg,
-  },
-  backButton: {
-    width: 44,
-    height: 44,
-    borderRadius: AIRadius.lg,
-    backgroundColor: AIColors.surface,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: AISpacing.md,
     borderWidth: 1,
     borderColor: AIColors.border,
+    backgroundColor: AIColors.surface,
   },
-  backIcon: {
-    fontSize: 20,
-    color: AIColors.text,
-  },
-  headerTitles: {
-    flex: 1,
-  },
-  headerTitle: {
-    ...AITypography.h2,
-    color: AIColors.text,
-  },
-  headerSubtitle: {
-    ...AITypography.bodySmall,
-    color: AIColors.textSecondary,
-    marginTop: 2,
-  },
-  stepBadge: {
-    paddingHorizontal: AISpacing.md,
-    paddingVertical: AISpacing.xs,
-    backgroundColor: AIColors.primaryDim,
-    borderRadius: AIRadius.full,
-  },
-  stepBadgeText: {
-    ...AITypography.label,
-    color: AIColors.primary,
-  },
-  progressContainer: {
-    marginTop: AISpacing.sm,
-  },
-
-  // Content
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingHorizontal: AISpacing.xl,
-    paddingVertical: AISpacing.xl,
-  },
-  stepContent: {
-    flex: 1,
-  },
-  stepHeader: {
-    marginBottom: AISpacing.xl,
-  },
-  stepIcon: {
-    fontSize: 36,
-    marginBottom: AISpacing.sm,
-  },
-  stepTitle: {
-    ...AITypography.h1,
-    color: AIColors.text,
-    marginBottom: AISpacing.xs,
-  },
-  stepSubtitle: {
-    ...AITypography.body,
-    color: AIColors.textSecondary,
-  },
-
-  // Input Group
-  inputGroup: {
-    marginBottom: AISpacing.xl,
-  },
-  inputLabel: {
-    ...AITypography.label,
-    color: AIColors.textSecondary,
-    marginBottom: AISpacing.sm,
-  },
-
-  // Currency Input
-  currencyInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  stepPillActive: { borderColor: AIColors.primary, backgroundColor: AIColors.primaryDim },
+  stepText: { color: AIColors.textSecondary, fontWeight: '700' },
+  stepTextActive: { color: AIColors.primary },
+  card: {
     backgroundColor: AIColors.surface,
     borderRadius: AIRadius.xl,
-    borderWidth: 1.5,
-    borderColor: AIColors.border,
-    paddingHorizontal: AISpacing.md,
-    paddingVertical: AISpacing.sm,
-  },
-  currencyIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: AIRadius.md,
-    backgroundColor: AIColors.surfaceLight,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: AISpacing.sm,
-  },
-  currencyEmoji: {
-    fontSize: 18,
-  },
-  currencyBadge: {
-    backgroundColor: AIColors.primary,
-    paddingHorizontal: AISpacing.sm,
-    paddingVertical: AISpacing.xs,
-    borderRadius: AIRadius.md,
-    marginRight: AISpacing.sm,
-  },
-  currencySymbol: {
-    ...AITypography.body,
-    color: AIColors.background,
-    fontWeight: '700',
-  },
-  currencyInput: {
-    flex: 1,
-    ...AITypography.h2,
-    color: AIColors.text,
-    paddingVertical: AISpacing.sm,
-  },
-  formattedValue: {
-    ...AITypography.body,
-    color: AIColors.textSecondary,
-  },
-
-  // Employment Grid
-  employmentGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: AISpacing.sm,
-  },
-  employmentChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: AIColors.surface,
-    paddingHorizontal: AISpacing.md,
-    paddingVertical: AISpacing.sm,
-    borderRadius: AIRadius.full,
-    borderWidth: 1.5,
-    borderColor: AIColors.border,
-    gap: AISpacing.xs,
-  },
-  employmentChipSelected: {
-    borderColor: AIColors.primary,
-    backgroundColor: AIColors.primaryDim,
-  },
-  employmentIcon: {
-    fontSize: 14,
-  },
-  employmentLabel: {
-    ...AITypography.bodySmall,
-    color: AIColors.textSecondary,
-  },
-  employmentLabelSelected: {
-    color: AIColors.primary,
-  },
-
-  // Summary Card
-  summaryCard: {
-    marginTop: AISpacing.md,
-    padding: AISpacing.md,
-  },
-  summaryRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: AISpacing.sm,
-  },
-  summaryLabel: {
-    ...AITypography.body,
-    color: AIColors.textSecondary,
-  },
-  summaryValue: {
-    ...AITypography.h3,
-    color: AIColors.text,
-  },
-  summaryDivider: {
-    height: 1,
-    backgroundColor: AIColors.border,
-  },
-
-  // Goals Grid
-  goalsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: AISpacing.sm,
-    marginBottom: AISpacing.lg,
-  },
-  goalCard: {
-    width: (width - AISpacing.xl * 2 - AISpacing.sm * 2) / 3,
-    aspectRatio: 1,
-    backgroundColor: AIColors.surface,
-    borderRadius: AIRadius.lg,
-    borderWidth: 1.5,
-    borderColor: AIColors.border,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: AISpacing.sm,
-    position: 'relative',
-  },
-  goalCardSelected: {
-    borderColor: AIColors.primary,
-    backgroundColor: AIColors.primaryDim,
-  },
-  goalIcon: {
-    fontSize: 24,
-    marginBottom: AISpacing.xs,
-  },
-  goalLabel: {
-    ...AITypography.labelSmall,
-    color: AIColors.textSecondary,
-    textAlign: 'center',
-  },
-  goalLabelSelected: {
-    color: AIColors.primary,
-  },
-  goalCheck: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: AIColors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  goalCheckIcon: {
-    fontSize: 12,
-    color: AIColors.background,
-    fontWeight: '700',
-  },
-  selectedCount: {
-    ...AITypography.body,
-    color: AIColors.textSecondary,
-    textAlign: 'center',
-  },
-
-  // Risk Options
-  riskOptions: {
-    flexDirection: 'row',
-    gap: AISpacing.sm,
-  },
-  riskOption: {
-    flex: 1,
-    backgroundColor: AIColors.surface,
-    borderRadius: AIRadius.lg,
-    borderWidth: 1.5,
+    borderWidth: 1,
     borderColor: AIColors.border,
     padding: AISpacing.md,
-    alignItems: 'center',
-  },
-  riskOptionSelected: {
-    borderColor: AIColors.primary,
-    backgroundColor: AIColors.primaryDim,
-  },
-  riskOptionIcon: {
-    fontSize: 28,
-    marginBottom: AISpacing.sm,
-  },
-  riskOptionIconSelected: {},
-  riskOptionLabel: {
-    ...AITypography.bodySmall,
-    color: AIColors.textSecondary,
-    textAlign: 'center',
-  },
-  riskOptionLabelSelected: {
-    color: AIColors.primary,
-    fontWeight: '600',
-  },
-
-  // Experience Scale
-  sliderHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: AISpacing.sm,
-  },
-  experienceValue: {
-    ...AITypography.h3,
-    color: AIColors.primary,
-  },
-  experienceScale: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: AISpacing.sm,
-  },
-  experienceDot: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: AIColors.surface,
-    borderWidth: 2,
-    borderColor: AIColors.border,
-  },
-  experienceDotActive: {
-    backgroundColor: AIColors.primary,
-    borderColor: AIColors.primary,
-  },
-  experienceLabels: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  experienceLabelText: {
-    ...AITypography.labelSmall,
-    color: AIColors.textMuted,
-  },
-
-  // Final Summary
-  finalSummary: {
-    marginTop: AISpacing.lg,
-  },
-  finalSummaryTitle: {
-    ...AITypography.h3,
-    color: AIColors.text,
     marginBottom: AISpacing.md,
+    ...AIShadows.sm,
   },
-  finalSummaryGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: AISpacing.md,
-  },
-  finalSummaryItem: {
-    width: '45%',
-    backgroundColor: AIColors.surfaceLight,
+  sectionTitle: { fontSize: 17, fontWeight: '700', color: AIColors.text, marginBottom: AISpacing.sm },
+  inputLabel: { fontSize: 12, color: AIColors.textSecondary, marginBottom: 6, marginTop: 6 },
+  input: {
+    backgroundColor: AIColors.backgroundSecondary,
+    borderWidth: 1,
+    borderColor: AIColors.border,
     borderRadius: AIRadius.md,
-    padding: AISpacing.sm,
-  },
-  finalSummaryLabel: {
-    ...AITypography.labelSmall,
-    color: AIColors.textSecondary,
-    marginBottom: 4,
-  },
-  finalSummaryValue: {
-    ...AITypography.body,
     color: AIColors.text,
-    fontWeight: '600',
+    paddingHorizontal: AISpacing.sm,
+    paddingVertical: 10,
+    fontSize: 15,
   },
-
-  // Footer
-  footer: {
-    paddingHorizontal: AISpacing.xl,
-    paddingVertical: AISpacing.lg,
-    borderTopWidth: 1,
-    borderTopColor: AIColors.border,
+  helper: { fontSize: 12, color: AIColors.textMuted, marginTop: 8, lineHeight: 18 },
+  wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 },
+  chip: {
+    borderRadius: AIRadius.full,
+    borderWidth: 1,
+    borderColor: AIColors.border,
+    backgroundColor: AIColors.backgroundSecondary,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
   },
-  continueButton: {
-    flexDirection: 'row',
+  chipActive: { borderColor: AIColors.primary, backgroundColor: AIColors.primaryDim },
+  chipText: { fontSize: 11, color: AIColors.textSecondary, fontWeight: '600' },
+  chipTextActive: { color: AIColors.primary },
+  sliderValue: { fontSize: 26, color: AIColors.primary, fontWeight: '900', marginBottom: 4 },
+  navRow: { flexDirection: 'row', gap: AISpacing.sm },
+  secondaryBtn: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: AIColors.primary,
-    paddingVertical: AISpacing.lg,
+    borderWidth: 1,
+    borderColor: AIColors.border,
     borderRadius: AIRadius.lg,
-    ...AIShadows.glow,
-  },
-  continueButtonDisabled: {
+    paddingVertical: 13,
     backgroundColor: AIColors.surface,
-    shadowOpacity: 0,
   },
-  continueButtonText: {
-    ...AITypography.button,
-    color: AIColors.background,
-    fontWeight: '600',
+  secondaryText: { fontSize: 13, color: AIColors.textSecondary, fontWeight: '700' },
+  primaryBtn: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: AIRadius.lg,
+    paddingVertical: 13,
+    backgroundColor: AIColors.primary,
   },
-  continueButtonTextDisabled: {
-    color: AIColors.textMuted,
-  },
-  continueButtonIcon: {
-    fontSize: 18,
-    color: AIColors.background,
-    marginLeft: AISpacing.sm,
-  },
+  primaryText: { fontSize: 13, color: AIColors.background, fontWeight: '800' },
+  btnDisabled: { opacity: 0.5 },
 });

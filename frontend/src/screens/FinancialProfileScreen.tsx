@@ -1,44 +1,61 @@
 /**
- * Profile Tab - User financial profile overview
+ * Profile tab - financial profile overview and insights
  */
 
-import React, { useState, useCallback } from 'react';
-import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator,
-} from 'react-native';
+import React, { useCallback, useMemo, useState } from 'react';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
-  FinancialProfile, RootStackParamList,
-  UserTypeLabels, RiskToleranceLabels, EmploymentTypeLabels,
-  FinancialGoalLabels, FinancialGoalIcons,
+  EmploymentTypeLabels,
+  FinancialGoalLabels,
+  FinancialProfile,
+  RootStackParamList,
+  RiskToleranceLabels,
+  UserTypeLabels,
 } from '../types';
 import { useAuthStore } from '../store/authStore';
-import { AIColors, AISpacing, AIRadius } from '../theme/aiTheme';
+import { AIColors, AIRadius, AISpacing, AIShadows } from '../theme/aiTheme';
 
 const FINANCIAL_PROFILE_KEY = 'financial_profile';
 type StackNav = NativeStackNavigationProp<RootStackParamList>;
 
-function fmt(n: number): string {
-  if (n >= 100000) return '\u20B9' + (n / 100000).toFixed(1) + 'L';
-  if (n >= 1000) return '\u20B9' + (n / 1000).toFixed(1) + 'K';
-  return '\u20B9' + n.toLocaleString();
+function money(v: number): string {
+  if (v >= 10000000) return '\\u20B9' + (v / 10000000).toFixed(1) + 'Cr';
+  if (v >= 100000) return '\\u20B9' + (v / 100000).toFixed(1) + 'L';
+  if (v >= 1000) return '\\u20B9' + (v / 1000).toFixed(1) + 'K';
+  return '\\u20B9' + v.toLocaleString();
 }
 
 export default function FinancialProfileScreen() {
   const nav = useNavigation<StackNav>();
   const { currentUser: user } = useAuthStore();
-  const [profile, setProfile] = useState<FinancialProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [profile, setProfile] = useState<FinancialProfile | null>(null);
 
-  useFocusEffect(useCallback(() => {
-    AsyncStorage.getItem(FINANCIAL_PROFILE_KEY)
-      .then((d) => { if (d) setProfile(JSON.parse(d)); })
-      .catch(console.error)
-      .finally(() => setLoading(false));
-  }, []));
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      AsyncStorage.getItem(FINANCIAL_PROFILE_KEY)
+        .then((raw) => {
+          if (!active) return;
+          setProfile(raw ? JSON.parse(raw) : null);
+        })
+        .finally(() => {
+          if (active) setLoading(false);
+        });
+      return () => {
+        active = false;
+      };
+    }, [])
+  );
+
+  const monthlySurplus = useMemo(() => {
+    if (!profile) return 0;
+    return profile.monthlyIncome - profile.monthlyExpenses;
+  }, [profile]);
 
   if (loading) {
     return (
@@ -48,166 +65,145 @@ export default function FinancialProfileScreen() {
     );
   }
 
-  const PERSONAL_ROWS = [
-    { label: 'Name',          value: user?.displayName || user?.fullName || 'Not set' },
-    { label: 'Phone',         value: user?.phoneNumber || 'Not set' },
-    { label: 'Email',         value: user?.email || 'Not set' },
-    { label: 'Profile Type',  value: user?.userType ? UserTypeLabels[user.userType] : 'Not set' },
-    { label: 'Risk Appetite', value: user?.riskTolerance ? RiskToleranceLabels[user.riskTolerance] : 'Not set' },
-  ];
-
-  const FINANCE_ROWS = profile ? [
-    { label: 'Monthly Income',    value: fmt(profile.monthlyIncome),   color: AIColors.primary },
-    { label: 'Monthly Expenses',  value: fmt(profile.monthlyExpenses),  color: AIColors.warning },
-    { label: 'Total Savings',     value: fmt(profile.totalSavings),     color: AIColors.success },
-    { label: 'Existing Loans',    value: fmt(profile.existingLoans),    color: AIColors.error },
-    { label: 'Employment',        value: EmploymentTypeLabels[profile.employmentType], color: AIColors.secondary },
-    { label: 'Invest. Experience',value: profile.investmentExperience + '/10', color: AIColors.warning },
-  ] : [];
-
   return (
-    <View style={styles.container}>
-      <SafeAreaView style={{ flex: 1 }}>
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
-          <View style={styles.profileHeader}>
-            <View style={styles.bigAvatar}>
-              <Text style={styles.bigAvatarText}>
-                {user?.displayName?.charAt(0)?.toUpperCase() || '?'}
-              </Text>
-            </View>
-            <Text style={styles.displayName}>{user?.displayName || 'User'}</Text>
-            <View style={styles.typeBadge}>
-              <Text style={styles.typeText}>
-                {user?.userType ? UserTypeLabels[user.userType] : 'Unknown type'}
-              </Text>
+    <SafeAreaView style={styles.safe}>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <View style={styles.heroCard}>
+          <View style={styles.avatar}>
+            <Text style={styles.avatarText}>{user?.displayName?.charAt(0)?.toUpperCase() || 'U'}</Text>
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.name}>{user?.displayName || user?.fullName || 'User'}</Text>
+            <Text style={styles.phone}>{user?.phoneNumber || ''}</Text>
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>{user?.userType ? UserTypeLabels[user.userType] : 'Financial User'}</Text>
             </View>
           </View>
+        </View>
 
-          <Text style={styles.sectionTitle}>Personal Info</Text>
-          <View style={styles.infoCard}>
-            {PERSONAL_ROWS.map((row, i) => (
-              <View key={row.label}>
-                <View style={styles.row}>
-                  <Text style={styles.rowLabel}>{row.label}</Text>
-                  <Text style={styles.rowValue} numberOfLines={1}>{row.value}</Text>
-                </View>
-                {i < PERSONAL_ROWS.length - 1 && <View style={styles.divider} />}
-              </View>
-            ))}
+        <Text style={styles.sectionTitle}>Personal</Text>
+        <View style={styles.card}>
+          <View style={styles.row}><Text style={styles.rowLabel}>Email</Text><Text style={styles.rowValue}>{user?.email || 'Not set'}</Text></View>
+          <View style={styles.divider} />
+          <View style={styles.row}><Text style={styles.rowLabel}>Risk Profile</Text><Text style={styles.rowValue}>{user?.riskTolerance ? RiskToleranceLabels[user.riskTolerance] : 'Not set'}</Text></View>
+        </View>
+
+        <Text style={styles.sectionTitle}>Financial Snapshot</Text>
+        <View style={styles.grid}>
+          <View style={styles.statCard}><Text style={styles.statLabel}>Income</Text><Text style={styles.statValue}>{money(profile?.monthlyIncome ?? 0)}</Text></View>
+          <View style={styles.statCard}><Text style={styles.statLabel}>Expenses</Text><Text style={styles.statValue}>{money(profile?.monthlyExpenses ?? 0)}</Text></View>
+          <View style={styles.statCard}><Text style={styles.statLabel}>Savings</Text><Text style={styles.statValue}>{money(profile?.totalSavings ?? 0)}</Text></View>
+          <View style={styles.statCard}><Text style={styles.statLabel}>Debt</Text><Text style={styles.statValue}>{money(profile?.existingLoans ?? 0)}</Text></View>
+        </View>
+
+        {profile && (
+          <View style={styles.card}>
+            <Text style={styles.sectionTitle}>Insights</Text>
+            <Text style={styles.insight}>Monthly surplus: {money(monthlySurplus)}</Text>
+            <Text style={styles.insight}>Employment: {EmploymentTypeLabels[profile.employmentType]}</Text>
+            <Text style={styles.insight}>Investment experience: {profile.investmentExperience}/10</Text>
+            <Text style={styles.insight}>Goals selected: {profile.financialGoals.length}</Text>
           </View>
+        )}
 
-          {profile ? (
-            <>
-              <Text style={styles.sectionTitle}>Financial Snapshot</Text>
-              <View style={styles.finGrid}>
-                {FINANCE_ROWS.map((r) => (
-                  <View key={r.label} style={styles.finCard}>
-                    <Text style={styles.finLabel}>{r.label.toUpperCase()}</Text>
-                    <Text style={[styles.finValue, { color: r.color }]}>{r.value}</Text>
-                  </View>
-                ))}
-              </View>
-
-              {profile.financialGoals.length > 0 && (
-                <>
-                  <Text style={styles.sectionTitle}>Financial Goals</Text>
-                  <View style={styles.goalsGrid}>
-                    {profile.financialGoals.map((g) => (
-                      <View key={g} style={styles.goalCard}>
-                        <Text style={styles.goalIcon}>{FinancialGoalIcons[g]}</Text>
-                        <Text style={styles.goalLabel}>{FinancialGoalLabels[g]}</Text>
-                      </View>
-                    ))}
-                  </View>
-                </>
-              )}
-
-              <Text style={styles.updatedAt}>
-                Last updated: {new Date(profile.updatedAt).toLocaleDateString('en-IN', {
-                  day: 'numeric', month: 'short', year: 'numeric',
-                })}
-              </Text>
-            </>
-          ) : (
-            <View style={styles.noProfile}>
-              <Text style={styles.noProfileText}>No financial profile yet.</Text>
+        {profile && profile.financialGoals.length > 0 && (
+          <View style={styles.card}>
+            <Text style={styles.sectionTitle}>Goal Preferences</Text>
+            <View style={styles.goalWrap}>
+              {profile.financialGoals.map((g) => (
+                <View key={g} style={styles.goalPill}><Text style={styles.goalText}>{FinancialGoalLabels[g]}</Text></View>
+              ))}
             </View>
-          )}
+          </View>
+        )}
 
-          <TouchableOpacity style={styles.editBtn} onPress={() => nav.navigate('FinancialInput')}>
-            <Text style={styles.editBtnText}>Edit Financial Profile</Text>
-          </TouchableOpacity>
+        <TouchableOpacity style={styles.cta} onPress={() => nav.navigate('FinancialInput')}>
+          <Text style={styles.ctaText}>Update Financial Profile</Text>
+        </TouchableOpacity>
 
-          <View style={{ height: 32 }} />
-        </ScrollView>
-      </SafeAreaView>
-    </View>
+        <View style={{ height: 96 }} />
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: AIColors.background },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: AIColors.background },
-  scroll: { paddingHorizontal: AISpacing.lg, paddingTop: AISpacing.lg, paddingBottom: 96 },
-
-  profileHeader: { alignItems: 'center', marginBottom: 24 },
-  bigAvatar: {
-    width: 80, height: 80, borderRadius: 40,
+  safe: { flex: 1, backgroundColor: AIColors.background },
+  content: { padding: AISpacing.md },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: AIColors.background },
+  heroCard: {
+    flexDirection: 'row',
+    gap: AISpacing.md,
+    alignItems: 'center',
+    backgroundColor: AIColors.surface,
+    borderWidth: 1,
+    borderColor: AIColors.border,
+    borderRadius: AIRadius.xl,
+    padding: AISpacing.md,
+    marginBottom: AISpacing.md,
+    ...AIShadows.sm,
+  },
+  avatar: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
     backgroundColor: AIColors.primary,
-    justifyContent: 'center', alignItems: 'center', marginBottom: 12,
-    borderWidth: 3, borderColor: AIColors.primary + '50',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  bigAvatarText: { fontSize: 32, fontWeight: '800', color: AIColors.background },
-  displayName: { fontSize: 22, fontWeight: '800', color: AIColors.text, marginBottom: 8 },
-  typeBadge: {
-    backgroundColor: AIColors.primary + '18',
-    borderRadius: AIRadius.full, paddingHorizontal: 12, paddingVertical: 4,
-    borderWidth: 1, borderColor: AIColors.primary + '30',
+  avatarText: { fontSize: 30, fontWeight: '900', color: AIColors.background },
+  name: { fontSize: 21, fontWeight: '800', color: AIColors.text, marginBottom: 2 },
+  phone: { fontSize: 13, color: AIColors.textSecondary, marginBottom: 8 },
+  badge: {
+    alignSelf: 'flex-start',
+    backgroundColor: AIColors.primaryDim,
+    borderRadius: AIRadius.full,
+    borderWidth: 1,
+    borderColor: AIColors.borderGlow,
+    paddingHorizontal: AISpacing.sm,
+    paddingVertical: 4,
   },
-  typeText: { fontSize: 12, color: AIColors.primary, fontWeight: '600' },
-
-  sectionTitle: { fontSize: 16, fontWeight: '700', color: AIColors.text, marginBottom: 10 },
-
-  infoCard: {
-    backgroundColor: AIColors.surface, borderRadius: AIRadius.xl,
-    borderWidth: 1, borderColor: AIColors.border, overflow: 'hidden', marginBottom: 20,
+  badgeText: { fontSize: 11, color: AIColors.primary, fontWeight: '700' },
+  sectionTitle: { fontSize: 16, fontWeight: '700', color: AIColors.text, marginBottom: AISpacing.sm },
+  card: {
+    backgroundColor: AIColors.surface,
+    borderWidth: 1,
+    borderColor: AIColors.border,
+    borderRadius: AIRadius.lg,
+    padding: AISpacing.md,
+    marginBottom: AISpacing.md,
   },
-  row: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: AISpacing.md, paddingVertical: 12,
+  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  rowLabel: { fontSize: 13, color: AIColors.textSecondary },
+  rowValue: { fontSize: 13, color: AIColors.text, fontWeight: '600', maxWidth: '65%', textAlign: 'right' },
+  divider: { height: 1, backgroundColor: AIColors.border, marginVertical: 10 },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: AISpacing.sm, marginBottom: AISpacing.md },
+  statCard: {
+    width: '48%',
+    backgroundColor: AIColors.surface,
+    borderWidth: 1,
+    borderColor: AIColors.border,
+    borderRadius: AIRadius.lg,
+    padding: AISpacing.sm,
   },
-  rowLabel: { fontSize: 14, color: AIColors.textSecondary },
-  rowValue: { fontSize: 14, fontWeight: '600', color: AIColors.text, maxWidth: '55%', textAlign: 'right' },
-  divider: { height: 1, backgroundColor: AIColors.border, marginHorizontal: AISpacing.md },
-
-  finGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 20 },
-  finCard: {
-    flex: 1, minWidth: '46%',
-    backgroundColor: AIColors.surface, borderRadius: AIRadius.lg,
-    padding: AISpacing.md, borderWidth: 1, borderColor: AIColors.border,
+  statLabel: { fontSize: 11, color: AIColors.textMuted, marginBottom: 4 },
+  statValue: { fontSize: 15, color: AIColors.text, fontWeight: '700' },
+  insight: { fontSize: 13, color: AIColors.textSecondary, marginBottom: 6 },
+  goalWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  goalPill: {
+    backgroundColor: AIColors.backgroundSecondary,
+    borderWidth: 1,
+    borderColor: AIColors.border,
+    borderRadius: AIRadius.full,
+    paddingHorizontal: AISpacing.sm,
+    paddingVertical: 5,
   },
-  finLabel: { fontSize: 10, color: AIColors.textSecondary, letterSpacing: 0.5, marginBottom: 6 },
-  finValue: { fontSize: 18, fontWeight: '700' },
-
-  goalsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 16 },
-  goalCard: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    backgroundColor: AIColors.surface, borderRadius: AIRadius.lg,
-    paddingHorizontal: 12, paddingVertical: 8,
-    borderWidth: 1, borderColor: AIColors.border,
+  goalText: { fontSize: 11, color: AIColors.textSecondary },
+  cta: {
+    backgroundColor: AIColors.primary,
+    borderRadius: AIRadius.xl,
+    paddingVertical: 14,
+    alignItems: 'center',
   },
-  goalIcon: { fontSize: 16, color: AIColors.primary },
-  goalLabel: { fontSize: 12, color: AIColors.text, fontWeight: '500' },
-
-  updatedAt: { fontSize: 11, color: AIColors.textMuted, textAlign: 'center', marginBottom: 16 },
-
-  noProfile: { alignItems: 'center', padding: 24 },
-  noProfileText: { fontSize: 14, color: AIColors.textSecondary },
-
-  editBtn: {
-    backgroundColor: AIColors.surface, borderRadius: AIRadius.xl,
-    padding: AISpacing.md, alignItems: 'center',
-    borderWidth: 1, borderColor: AIColors.primary + '40',
-  },
-  editBtnText: { fontSize: 14, fontWeight: '700', color: AIColors.primary },
+  ctaText: { color: AIColors.background, fontSize: 14, fontWeight: '800' },
 });

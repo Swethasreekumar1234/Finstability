@@ -1,107 +1,125 @@
 /**
- * Health Tab - Financial health score breakdown
+ * Health Tab - Financial health score dashboard
  */
 
-import React, { useState, useCallback } from 'react';
-import {
-  View, Text, StyleSheet, ScrollView, ActivityIndicator,
-} from 'react-native';
+import React, { useCallback, useMemo, useState } from 'react';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { FinancialProfile, FinancialGoalLabels } from '../types';
-import { AIColors, AISpacing, AIRadius } from '../theme/aiTheme';
-import { ProgressBar } from '../components/ai';
+import { FinancialGoalLabels, FinancialProfile } from '../types';
+import { AIColors, AIRadius, AISpacing, AIShadows } from '../theme/aiTheme';
+import { calculateHealthScore } from './DashboardScreen';
 
 const FINANCIAL_PROFILE_KEY = 'financial_profile';
 
-interface Breakdown {
+interface Metric {
+  key: string;
   label: string;
   score: number;
   max: number;
-  desc: string;
   color: string;
-  tip: string;
+  detail: string;
 }
 
-function buildBreakdown(p: FinancialProfile): Breakdown[] {
-  const savingsRate = p.monthlyIncome > 0
-    ? (p.totalSavings / (p.monthlyIncome * 12)) * 100 : 0;
-  let savingsScore = 0;
-  if (savingsRate >= 20) savingsScore = 15;
-  else if (savingsRate >= 10) savingsScore = 10;
-  else savingsScore = Math.round(savingsRate / 2);
+function scoreLabel(score: number): { label: string; color: string } {
+  if (score >= 80) return { label: 'Excellent', color: AIColors.success };
+  if (score >= 60) return { label: 'Good', color: AIColors.primary };
+  if (score >= 40) return { label: 'Fair', color: AIColors.warning };
+  return { label: 'Needs Attention', color: AIColors.error };
+}
 
-  const dti = p.monthlyIncome > 0 ? p.existingLoans / p.monthlyIncome : 0;
-  let debtScore = 0;
-  if (dti <= 0.3) debtScore = 15;
-  else if (dti <= 0.5) debtScore = 10;
-  else debtScore = Math.max(0, 10 - Math.round((dti - 0.5) * 20));
+function money(n: number): string {
+  if (n >= 10000000) return '\\u20B9' + (n / 10000000).toFixed(1) + 'Cr';
+  if (n >= 100000) return '\\u20B9' + (n / 100000).toFixed(1) + 'L';
+  if (n >= 1000) return '\\u20B9' + (n / 1000).toFixed(1) + 'K';
+  return '\\u20B9' + n.toFixed(0);
+}
 
-  const goalsScore = p.financialGoals.length >= 3 ? 10 : p.financialGoals.length >= 1 ? 5 : 0;
-  const expScore = p.investmentExperience * 2;
+function buildMetrics(p: FinancialProfile): Metric[] {
+  const annualIncome = p.monthlyIncome * 12;
+  const savingsRate = annualIncome > 0 ? (p.totalSavings / annualIncome) * 100 : 0;
+  const debtRatio = p.monthlyIncome > 0 ? p.existingLoans / p.monthlyIncome : 0;
+  const expenseRatio = p.monthlyIncome > 0 ? p.monthlyExpenses / p.monthlyIncome : 1;
+
+  const savingsScore = savingsRate >= 20 ? 25 : savingsRate >= 10 ? 18 : Math.max(6, Math.round(savingsRate));
+  const debtScore = debtRatio <= 0.3 ? 25 : debtRatio <= 0.6 ? 16 : Math.max(3, 20 - Math.round((debtRatio - 0.6) * 15));
+  const planningScore = p.financialGoals.length >= 3 ? 25 : p.financialGoals.length >= 1 ? 16 : 8;
+  const cashflowScore = expenseRatio <= 0.6 ? 25 : expenseRatio <= 0.8 ? 16 : Math.max(4, 18 - Math.round((expenseRatio - 0.8) * 20));
 
   return [
     {
-      label: 'Savings Rate',
-      score: savingsScore,
-      max: 15,
-      desc: savingsRate.toFixed(0) + '% annual savings rate',
+      key: 'savings',
+      label: 'Savings Strength',
+      score: Math.min(25, savingsScore),
+      max: 25,
       color: AIColors.primary,
-      tip: savingsRate < 20
-        ? 'Try to save at least 20% of annual income. Automate savings to build the habit.'
-        : 'Great savings rate! Keep it consistent and grow it further.',
+      detail: savingsRate.toFixed(0) + '% annual savings rate',
     },
     {
+      key: 'debt',
       label: 'Debt Health',
-      score: debtScore,
-      max: 15,
-      desc: 'Debt-to-income ratio: ' + (dti * 100).toFixed(0) + '%',
+      score: Math.min(25, debtScore),
+      max: 25,
       color: AIColors.secondary,
-      tip: dti > 0.3
-        ? 'Your debt ratio is elevated. Focus on paying off high-interest loans first.'
-        : 'Healthy debt levels. Maintain this balance.',
+      detail: 'Debt-to-income: ' + (debtRatio * 100).toFixed(0) + '%',
     },
     {
-      label: 'Goal Setting',
-      score: goalsScore,
-      max: 10,
-      desc: p.financialGoals.length + ' active goal' + (p.financialGoals.length !== 1 ? 's' : ''),
+      key: 'goals',
+      label: 'Goal Planning',
+      score: Math.min(25, planningScore),
+      max: 25,
       color: AIColors.success,
-      tip: p.financialGoals.length < 3
-        ? 'Define at least 3 financial goals to improve planning clarity.'
-        : 'Well-defined goals! Review them quarterly.',
+      detail: p.financialGoals.length + ' active goal' + (p.financialGoals.length === 1 ? '' : 's'),
     },
     {
-      label: 'Investment Experience',
-      score: expScore,
-      max: 20,
-      desc: 'Experience level: ' + p.investmentExperience + '/10',
+      key: 'cashflow',
+      label: 'Cashflow Discipline',
+      score: Math.min(25, cashflowScore),
+      max: 25,
       color: AIColors.warning,
-      tip: p.investmentExperience < 5
-        ? 'Start with low-risk instruments like PPF or FDs to build confidence.'
-        : 'Strong investment experience. Diversify across asset classes.',
+      detail: (expenseRatio * 100).toFixed(0) + '% income used for monthly expenses',
     },
   ];
 }
 
-function getScoreInfo(s: number): { label: string; color: string } {
-  if (s >= 80) return { label: 'Excellent', color: AIColors.success };
-  if (s >= 60) return { label: 'Good', color: AIColors.primary };
-  if (s >= 40) return { label: 'Fair', color: AIColors.warning };
-  return { label: 'Needs Work', color: AIColors.error };
+function sparkline(seed: number): number[] {
+  const base = Math.max(25, Math.min(95, seed));
+  return [
+    Math.max(10, base - 15),
+    Math.max(10, base - 10),
+    Math.max(10, base - 5),
+    Math.max(10, base - 8),
+    Math.max(10, base - 3),
+    base,
+  ];
 }
 
 export default function FinancialHealthScoreScreen() {
   const [profile, setProfile] = useState<FinancialProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useFocusEffect(useCallback(() => {
-    AsyncStorage.getItem(FINANCIAL_PROFILE_KEY)
-      .then((d) => { if (d) setProfile(JSON.parse(d)); })
-      .catch(console.error)
-      .finally(() => setLoading(false));
-  }, []));
+  useFocusEffect(
+    useCallback(() => {
+      let mounted = true;
+      AsyncStorage.getItem(FINANCIAL_PROFILE_KEY)
+        .then((raw) => {
+          if (!mounted) return;
+          setProfile(raw ? JSON.parse(raw) : null);
+        })
+        .finally(() => {
+          if (mounted) setLoading(false);
+        });
+      return () => {
+        mounted = false;
+      };
+    }, [])
+  );
+
+  const score = useMemo(() => calculateHealthScore(profile), [profile]);
+  const level = scoreLabel(score);
+  const trend = useMemo(() => sparkline(score), [score]);
+  const metrics = useMemo(() => (profile ? buildMetrics(profile) : []), [profile]);
 
   if (loading) {
     return (
@@ -114,131 +132,191 @@ export default function FinancialHealthScoreScreen() {
   if (!profile) {
     return (
       <View style={styles.center}>
-        <Text style={styles.emptyTitle}>No Profile Data</Text>
-        <Text style={styles.emptyText}>Go to Home and tap "Update Financial Profile" to get started.</Text>
+        <Text style={styles.emptyTitle}>No Financial Profile</Text>
+        <Text style={styles.emptyText}>Go to Home and open Update Financial Profile to calculate your health score.</Text>
       </View>
     );
   }
 
-  const breakdown = buildBreakdown(profile);
-  let score = 50;
-  breakdown.forEach((b) => { score += b.score; });
-  score = Math.max(0, Math.min(100, score));
-  const { label: scoreLabel, color: scoreColor } = getScoreInfo(score);
-
   return (
-    <View style={styles.container}>
-      <SafeAreaView style={{ flex: 1 }}>
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
-          <Text style={styles.pageTitle}>Financial Health</Text>
-          <Text style={styles.pageSubtitle}>Your personalized score breakdown</Text>
+    <SafeAreaView style={styles.safe}>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <Text style={styles.pageTitle}>Financial Health</Text>
+        <Text style={styles.pageSubtitle}>Score built from savings, debt, goals, and cashflow quality.</Text>
 
-          <View style={styles.scoreCard}>
-            <View style={[styles.scoreCircle, { borderColor: scoreColor }]}>
-              <Text style={[styles.scoreBig, { color: scoreColor }]}>{score}</Text>
-              <Text style={styles.scoreOf}>/100</Text>
+        <View style={styles.heroCard}>
+          <View style={[styles.circleOuter, { borderColor: level.color + '44' }]}>
+            <View style={[styles.circleInner, { borderColor: level.color }]}> 
+              <Text style={[styles.scoreValue, { color: level.color }]}>{score}</Text>
+              <Text style={styles.scoreUnit}>/100</Text>
             </View>
-            <View style={[styles.scoreLabelBadge, { backgroundColor: scoreColor + '20' }]}>
-              <Text style={[styles.scoreLabelText, { color: scoreColor }]}>{scoreLabel}</Text>
-            </View>
-            <Text style={styles.scoreDesc}>
-              Based on your savings rate, debt levels, goals, and investment experience.
-            </Text>
           </View>
+          <View style={[styles.levelPill, { backgroundColor: level.color + '22' }]}>
+            <Text style={[styles.levelText, { color: level.color }]}>{level.label}</Text>
+          </View>
+        </View>
 
-          <Text style={styles.sectionTitle}>Score Breakdown</Text>
-          {breakdown.map((b) => (
-            <View key={b.label} style={styles.breakCard}>
-              <View style={styles.breakHeader}>
-                <Text style={styles.breakLabel}>{b.label}</Text>
-                <Text style={[styles.breakScore, { color: b.color }]}>{b.score}/{b.max}</Text>
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>6-Month Trend</Text>
+          <View style={styles.sparkWrap}>
+            {trend.map((v, i) => (
+              <View key={i} style={styles.sparkCol}>
+                <View style={[styles.sparkBar, { height: Math.max(20, v), backgroundColor: i === trend.length - 1 ? AIColors.primary : AIColors.surfaceLight }]} />
               </View>
-              <ProgressBar progress={b.score / b.max} color={b.color} height={6} />
-              <Text style={styles.breakDesc}>{b.desc}</Text>
+            ))}
+          </View>
+          <Text style={styles.trendNote}>Upward consistency compounds your long-term wealth.</Text>
+        </View>
+
+        <Text style={styles.sectionTitle}>Breakdown</Text>
+        {metrics.map((m) => {
+          const pct = Math.round((m.score / m.max) * 100);
+          const fillWidth = `${pct}%` as `${number}%`;
+          return (
+            <View key={m.key} style={styles.metricCard}>
+              <View style={styles.metricTop}>
+                <Text style={styles.metricLabel}>{m.label}</Text>
+                <Text style={[styles.metricScore, { color: m.color }]}>{m.score}/{m.max}</Text>
+              </View>
+              <View style={styles.barTrack}>
+                <View style={[styles.barFill, { width: fillWidth, backgroundColor: m.color }]} />
+              </View>
+              <Text style={styles.metricDetail}>{m.detail}</Text>
             </View>
-          ))}
+          );
+        })}
 
-          <Text style={styles.sectionTitle}>Improvement Tips</Text>
-          {breakdown.map((b) => (
-            <View key={b.label} style={styles.tipCard}>
-              <View style={[styles.tipDot, { backgroundColor: b.color }]} />
-              <View style={{ flex: 1 }}>
-                <Text style={styles.tipLabel}>{b.label}</Text>
-                <Text style={styles.tipText}>{b.tip}</Text>
-              </View>
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>Snapshot</Text>
+          <View style={styles.grid}>
+            <View style={styles.gridCell}>
+              <Text style={styles.gridLabel}>Income</Text>
+              <Text style={styles.gridValue}>{money(profile.monthlyIncome)}/mo</Text>
             </View>
-          ))}
+            <View style={styles.gridCell}>
+              <Text style={styles.gridLabel}>Expenses</Text>
+              <Text style={styles.gridValue}>{money(profile.monthlyExpenses)}/mo</Text>
+            </View>
+            <View style={styles.gridCell}>
+              <Text style={styles.gridLabel}>Savings</Text>
+              <Text style={styles.gridValue}>{money(profile.totalSavings)}</Text>
+            </View>
+            <View style={styles.gridCell}>
+              <Text style={styles.gridLabel}>Debt</Text>
+              <Text style={styles.gridValue}>{money(profile.existingLoans)}</Text>
+            </View>
+          </View>
+        </View>
 
-          {profile.financialGoals.length > 0 && (
-            <>
-              <Text style={styles.sectionTitle}>Your Goals</Text>
-              <View style={styles.goalsRow}>
-                {profile.financialGoals.map((g) => (
-                  <View key={g} style={styles.goalPill}>
-                    <Text style={styles.goalPillText}>{FinancialGoalLabels[g]}</Text>
-                  </View>
-                ))}
-              </View>
-            </>
-          )}
+        {profile.financialGoals.length > 0 && (
+          <View style={styles.card}>
+            <Text style={styles.sectionTitle}>Goal Focus</Text>
+            <View style={styles.goalWrap}>
+              {profile.financialGoals.map((g) => (
+                <View key={g} style={styles.goalPill}>
+                  <Text style={styles.goalPillText}>{FinancialGoalLabels[g]}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
 
-          <View style={{ height: 32 }} />
-        </ScrollView>
-      </SafeAreaView>
-    </View>
+        <View style={{ height: 96 }} />
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: AIColors.background },
-  center: {
-    flex: 1, justifyContent: 'center', alignItems: 'center',
-    backgroundColor: AIColors.background, padding: 24,
-  },
-  scroll: { paddingHorizontal: AISpacing.lg, paddingTop: AISpacing.lg, paddingBottom: 96 },
-  emptyTitle: { fontSize: 18, fontWeight: '700', color: AIColors.text, marginBottom: 8 },
+  safe: { flex: 1, backgroundColor: AIColors.background },
+  content: { padding: AISpacing.md },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: AIColors.background, padding: 24 },
+  emptyTitle: { fontSize: 20, fontWeight: '800', color: AIColors.text, marginBottom: 8 },
   emptyText: { fontSize: 14, color: AIColors.textSecondary, textAlign: 'center', lineHeight: 20 },
-  pageTitle: { fontSize: 24, fontWeight: '800', color: AIColors.text, marginBottom: 4 },
-  pageSubtitle: { fontSize: 14, color: AIColors.textSecondary, marginBottom: 20 },
-  scoreCard: {
-    backgroundColor: AIColors.surface, borderRadius: AIRadius.xl,
-    padding: AISpacing.xl, borderWidth: 1, borderColor: AIColors.border,
-    alignItems: 'center', marginBottom: AISpacing.xl,
+  pageTitle: { fontSize: 28, fontWeight: '900', color: AIColors.text, marginBottom: 2 },
+  pageSubtitle: { fontSize: 13, color: AIColors.textSecondary, marginBottom: AISpacing.md },
+  heroCard: {
+    backgroundColor: AIColors.surface,
+    borderRadius: AIRadius.xl,
+    borderWidth: 1,
+    borderColor: AIColors.border,
+    padding: AISpacing.lg,
+    alignItems: 'center',
+    marginBottom: AISpacing.md,
+    ...AIShadows.md,
   },
-  scoreCircle: {
-    width: 120, height: 120, borderRadius: 60, borderWidth: 4,
-    justifyContent: 'center', alignItems: 'center', marginBottom: 12,
+  circleOuter: {
+    width: 190,
+    height: 190,
+    borderRadius: 95,
+    borderWidth: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  scoreBig: { fontSize: 44, fontWeight: '800', lineHeight: 50 },
-  scoreOf: { fontSize: 14, color: AIColors.textSecondary },
-  scoreLabelBadge: {
-    borderRadius: AIRadius.full, paddingHorizontal: 12,
-    paddingVertical: 4, marginBottom: 10,
+  circleInner: {
+    width: 146,
+    height: 146,
+    borderRadius: 73,
+    borderWidth: 3,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: AIColors.backgroundSecondary,
   },
-  scoreLabelText: { fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
-  scoreDesc: { fontSize: 13, color: AIColors.textSecondary, textAlign: 'center', lineHeight: 18 },
-  sectionTitle: { fontSize: 16, fontWeight: '700', color: AIColors.text, marginBottom: 10, marginTop: 4 },
-  breakCard: {
-    backgroundColor: AIColors.surface, borderRadius: AIRadius.lg,
-    padding: AISpacing.md, borderWidth: 1, borderColor: AIColors.border, marginBottom: 10,
+  scoreValue: { fontSize: 52, fontWeight: '900', lineHeight: 56 },
+  scoreUnit: { fontSize: 13, color: AIColors.textSecondary },
+  levelPill: {
+    marginTop: AISpacing.md,
+    borderRadius: AIRadius.full,
+    paddingHorizontal: AISpacing.md,
+    paddingVertical: 6,
   },
-  breakHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
-  breakLabel: { fontSize: 14, fontWeight: '600', color: AIColors.text },
-  breakScore: { fontSize: 14, fontWeight: '700' },
-  breakDesc: { fontSize: 12, color: AIColors.textSecondary, marginTop: 6 },
-  tipCard: {
-    flexDirection: 'row', alignItems: 'flex-start', gap: 10,
-    backgroundColor: AIColors.surface, borderRadius: AIRadius.lg,
-    padding: AISpacing.md, borderWidth: 1, borderColor: AIColors.border, marginBottom: 10,
+  levelText: { fontSize: 12, fontWeight: '700', letterSpacing: 0.4, textTransform: 'uppercase' },
+  card: {
+    backgroundColor: AIColors.surface,
+    borderRadius: AIRadius.lg,
+    borderWidth: 1,
+    borderColor: AIColors.border,
+    padding: AISpacing.md,
+    marginBottom: AISpacing.md,
   },
-  tipDot: { width: 8, height: 8, borderRadius: 4, marginTop: 5 },
-  tipLabel: { fontSize: 13, fontWeight: '600', color: AIColors.text, marginBottom: 3 },
-  tipText: { fontSize: 13, color: AIColors.textSecondary, lineHeight: 18 },
-  goalsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: AISpacing.md },
+  sectionTitle: { fontSize: 16, fontWeight: '700', color: AIColors.text, marginBottom: AISpacing.sm },
+  sparkWrap: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', height: 120, marginBottom: AISpacing.sm },
+  sparkCol: { flex: 1, alignItems: 'center' },
+  sparkBar: { width: 22, borderRadius: 8 },
+  trendNote: { fontSize: 12, color: AIColors.textSecondary },
+  metricCard: {
+    backgroundColor: AIColors.surface,
+    borderRadius: AIRadius.lg,
+    borderWidth: 1,
+    borderColor: AIColors.border,
+    padding: AISpacing.md,
+    marginBottom: AISpacing.sm,
+  },
+  metricTop: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
+  metricLabel: { fontSize: 14, fontWeight: '700', color: AIColors.text },
+  metricScore: { fontSize: 13, fontWeight: '800' },
+  barTrack: { height: 8, borderRadius: 999, backgroundColor: AIColors.backgroundSecondary, overflow: 'hidden' },
+  barFill: { height: 8, borderRadius: 999 },
+  metricDetail: { fontSize: 12, color: AIColors.textSecondary, marginTop: 6 },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: AISpacing.sm },
+  gridCell: {
+    width: '48%',
+    backgroundColor: AIColors.backgroundSecondary,
+    borderRadius: AIRadius.md,
+    padding: AISpacing.sm,
+    borderWidth: 1,
+    borderColor: AIColors.border,
+  },
+  gridLabel: { fontSize: 11, color: AIColors.textMuted, marginBottom: 2 },
+  gridValue: { fontSize: 14, fontWeight: '700', color: AIColors.text },
+  goalWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: AISpacing.sm },
   goalPill: {
-    backgroundColor: AIColors.primary + '15', borderRadius: AIRadius.full,
-    paddingHorizontal: 12, paddingVertical: 6,
-    borderWidth: 1, borderColor: AIColors.primary + '30',
+    backgroundColor: AIColors.primaryDim,
+    borderRadius: AIRadius.full,
+    borderWidth: 1,
+    borderColor: AIColors.borderGlow,
+    paddingHorizontal: AISpacing.md,
+    paddingVertical: 6,
   },
-  goalPillText: { fontSize: 12, color: AIColors.primary, fontWeight: '500' },
+  goalPillText: { fontSize: 11, color: AIColors.primary, fontWeight: '600' },
 });
