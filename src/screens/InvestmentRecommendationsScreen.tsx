@@ -1,61 +1,233 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+/**
+ * Invest Tab - Loans and investment recommendations
+ */
+
+import React, { useState, useCallback } from 'react';
+import {
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../types';
-import { AIColors, AIRadius, AISpacing, AITypography } from '../theme/aiTheme';
+import { useFocusEffect } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { FinancialProfile, RiskTolerance } from '../types';
+import { useAuthStore } from '../store/authStore';
+import { AIColors, AISpacing, AIRadius } from '../theme/aiTheme';
+import {
+  getFinancialRecommendations,
+  LoanRecommendation,
+  InvestmentRecommendation,
+} from '../services/recommendationEngine';
 
-type Props = NativeStackScreenProps<RootStackParamList, 'InvestmentRecommendations'>;
+const FINANCIAL_PROFILE_KEY = 'financial_profile';
 
-const ideas = [
-  { name: 'Index Funds', risk: 'Moderate', plan: 'Long-term core portfolio with low cost and broad diversification.' },
-  { name: 'PPF + EPF Blend', risk: 'Low', plan: 'Stable debt-oriented backbone with tax efficiency.' },
-  { name: 'Flexi-cap Mutual Funds', risk: 'Moderate to High', plan: 'Managed exposure across market caps for growth.' },
-  { name: 'Gold ETF Allocation', risk: 'Low to Moderate', plan: 'Hedge 5-10% to reduce portfolio volatility.' },
-];
+const RISK_COLORS: Record<RiskTolerance, string> = {
+  LOW: AIColors.success,
+  MODERATE: AIColors.warning,
+  HIGH: AIColors.error,
+};
 
-export default function InvestmentRecommendationsScreen({}: Props) {
+type SubTab = 'invest' | 'loans' | 'tips';
+
+export default function InvestmentRecommendationsScreen() {
+  const { currentUser: user } = useAuthStore();
+  const [loans, setLoans] = useState<LoanRecommendation[]>([]);
+  const [investments, setInvestments] = useState<InvestmentRecommendation[]>([]);
+  const [tips, setTips] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<SubTab>('invest');
+
+  useFocusEffect(useCallback(() => {
+    (async () => {
+      try {
+        const data = await AsyncStorage.getItem(FINANCIAL_PROFILE_KEY);
+        const profile: FinancialProfile | undefined = data ? JSON.parse(data) : undefined;
+        if (user) {
+          const recs = getFinancialRecommendations(
+            user.userType,
+            profile?.monthlyIncome ?? user.monthlyIncome ?? 0,
+            profile?.riskTolerance ?? user.riskTolerance,
+            profile?.financialGoals ?? [],
+            profile
+          );
+          setInvestments(recs.investments);
+          setLoans(recs.loans);
+          setTips(recs.tips);
+        }
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [user]));
+
+  if (loading) {
+    return (
+      <View style={styles.center}>
+        <ActivityIndicator size="large" color={AIColors.primary} />
+      </View>
+    );
+  }
+
+  const TABS: Array<{ key: SubTab; label: string; count: number }> = [
+    { key: 'invest', label: 'Investments', count: investments.length },
+    { key: 'loans', label: 'Loans', count: loans.length },
+    { key: 'tips', label: 'Tips', count: tips.length },
+  ];
+
+  const isEmpty =
+    (activeTab === 'invest' && !investments.length) ||
+    (activeTab === 'loans' && !loans.length) ||
+    (activeTab === 'tips' && !tips.length);
+
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <Text style={styles.title}>Investment Recommendations</Text>
-        <Text style={styles.subtitle}>Curated ideas to balance growth, safety, and liquidity.</Text>
+    <View style={styles.container}>
+      <SafeAreaView style={{ flex: 1 }}>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
+          <Text style={styles.pageTitle}>Invest &amp; Finance</Text>
+          <Text style={styles.pageSubtitle}>Personalized recommendations for your goals</Text>
 
-        {ideas.map((idea) => (
-          <View key={idea.name} style={styles.ideaCard}>
-            <View style={styles.ideaTop}>
-              <Text style={styles.ideaName}>{idea.name}</Text>
-              <View style={styles.riskBadge}><Text style={styles.riskBadgeText}>{idea.risk}</Text></View>
-            </View>
-            <Text style={styles.ideaPlan}>{idea.plan}</Text>
+          <View style={styles.tabRow}>
+            {TABS.map((t) => (
+              <TouchableOpacity
+                key={t.key}
+                style={[styles.tabBtn, activeTab === t.key && styles.tabBtnActive]}
+                onPress={() => setActiveTab(t.key)}
+              >
+                <Text style={[styles.tabLabel, activeTab === t.key && styles.tabLabelActive]}>
+                  {t.label} ({t.count})
+                </Text>
+              </TouchableOpacity>
+            ))}
           </View>
-        ))}
-      </ScrollView>
-    </SafeAreaView>
+
+          {activeTab === 'invest' && investments.map((inv) => {
+            const riskColor = RISK_COLORS[inv.riskLevel] ?? AIColors.primary;
+            return (
+              <View key={inv.name} style={styles.card}>
+                <View style={styles.cardHeader}>
+                  <View style={[styles.badge, { backgroundColor: riskColor + '20' }]}>
+                    <Text style={[styles.badgeText, { color: riskColor }]}>{inv.riskLevel} RISK</Text>
+                  </View>
+                  <Text style={[styles.returnRate, { color: AIColors.success }]}>{inv.expectedReturns}</Text>
+                </View>
+                <Text style={styles.cardTitle}>{inv.name}</Text>
+                <Text style={styles.cardDesc}>{inv.description}</Text>
+                <View style={styles.metaRow}>
+                  <View style={styles.metaItem}>
+                    <Text style={styles.metaLabel}>Min Investment</Text>
+                    <Text style={styles.metaValue}>{inv.minInvestment}</Text>
+                  </View>
+                  <View style={styles.metaSep} />
+                  <View style={styles.metaItem}>
+                    <Text style={styles.metaLabel}>Lock-in Period</Text>
+                    <Text style={styles.metaValue}>{inv.lockInPeriod}</Text>
+                  </View>
+                </View>
+                {inv.taxBenefits && (
+                  <View style={styles.taxBadge}>
+                    <Text style={styles.taxBadgeText}>Tax Benefits Available</Text>
+                  </View>
+                )}
+              </View>
+            );
+          })}
+
+          {activeTab === 'loans' && loans.map((loan) => (
+            <View key={loan.name} style={styles.card}>
+              <View style={styles.cardHeader}>
+                <View style={[styles.badge, { backgroundColor: AIColors.secondary + '20' }]}>
+                  <Text style={[styles.badgeText, { color: AIColors.secondary }]}>{loan.type.toUpperCase()}</Text>
+                </View>
+                <Text style={[styles.returnRate, { color: AIColors.secondary }]}>{loan.interestRange}</Text>
+              </View>
+              <Text style={styles.cardTitle}>{loan.name}</Text>
+              <Text style={styles.cardDesc}>{loan.description}</Text>
+              <View style={styles.metaRow}>
+                <View style={styles.metaItem}>
+                  <Text style={styles.metaLabel}>Max Amount</Text>
+                  <Text style={styles.metaValue}>{loan.maxAmount}</Text>
+                </View>
+              </View>
+              <View style={styles.featuresList}>
+                {loan.features.slice(0, 3).map((f) => (
+                  <Text key={f} style={styles.featureItem}>{'\u2022'} {f}</Text>
+                ))}
+              </View>
+            </View>
+          ))}
+
+          {activeTab === 'tips' && tips.map((tip, i) => (
+            <View key={i} style={styles.tipCard}>
+              <View style={styles.tipNum}>
+                <Text style={styles.tipNumText}>{i + 1}</Text>
+              </View>
+              <Text style={styles.tipText}>{tip}</Text>
+            </View>
+          ))}
+
+          {isEmpty && (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyText}>Complete your profile to see personalized recommendations.</Text>
+            </View>
+          )}
+
+          <View style={{ height: 32 }} />
+        </ScrollView>
+      </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: AIColors.background },
-  content: { padding: AISpacing.lg, paddingBottom: AISpacing.xxl },
-  title: { ...AITypography.h1, color: AIColors.text },
-  subtitle: { ...AITypography.body, color: AIColors.textSecondary, marginTop: AISpacing.xs, marginBottom: AISpacing.lg },
-  ideaCard: {
-    backgroundColor: AIColors.surface,
-    borderRadius: AIRadius.xl,
-    borderWidth: 1,
-    borderColor: AIColors.border,
-    padding: AISpacing.md,
-    marginBottom: AISpacing.sm,
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: AIColors.background },
+  scroll: { paddingHorizontal: AISpacing.lg, paddingTop: AISpacing.lg, paddingBottom: 96 },
+  pageTitle: { fontSize: 24, fontWeight: '800', color: AIColors.text, marginBottom: 4 },
+  pageSubtitle: { fontSize: 14, color: AIColors.textSecondary, marginBottom: 16 },
+  tabRow: {
+    flexDirection: 'row', gap: 6, marginBottom: 16,
+    backgroundColor: AIColors.surface, borderRadius: AIRadius.lg,
+    padding: 4, borderWidth: 1, borderColor: AIColors.border,
   },
-  ideaTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: AISpacing.xs, gap: AISpacing.sm },
-  ideaName: { ...AITypography.h3, color: AIColors.text, flex: 1 },
-  riskBadge: {
-    backgroundColor: AIColors.successDim,
-    borderRadius: AIRadius.full,
-    paddingHorizontal: AISpacing.sm,
-    paddingVertical: 4,
+  tabBtn: { flex: 1, borderRadius: AIRadius.md, paddingVertical: 8, alignItems: 'center' },
+  tabBtnActive: { backgroundColor: AIColors.primary },
+  tabLabel: { fontSize: 12, fontWeight: '600', color: AIColors.textSecondary },
+  tabLabelActive: { color: AIColors.background },
+  card: {
+    backgroundColor: AIColors.surface, borderRadius: AIRadius.xl,
+    padding: AISpacing.md, borderWidth: 1, borderColor: AIColors.border, marginBottom: 12,
   },
-  riskBadgeText: { ...AITypography.labelSmall, color: AIColors.success },
-  ideaPlan: { ...AITypography.bodySmall, color: AIColors.textSecondary },
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  badge: { borderRadius: AIRadius.sm, paddingHorizontal: 8, paddingVertical: 3 },
+  badgeText: { fontSize: 10, fontWeight: '700', letterSpacing: 0.5 },
+  returnRate: { fontSize: 14, fontWeight: '700' },
+  cardTitle: { fontSize: 15, fontWeight: '700', color: AIColors.text, marginBottom: 4 },
+  cardDesc: { fontSize: 13, color: AIColors.textSecondary, lineHeight: 18, marginBottom: 10 },
+  metaRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
+  metaItem: { flex: 1 },
+  metaSep: { width: 1, height: 28, backgroundColor: AIColors.border, marginHorizontal: 10 },
+  metaLabel: { fontSize: 10, color: AIColors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 },
+  metaValue: { fontSize: 13, fontWeight: '600', color: AIColors.text },
+  taxBadge: {
+    backgroundColor: AIColors.success + '15', borderRadius: AIRadius.sm,
+    paddingHorizontal: 8, paddingVertical: 4, alignSelf: 'flex-start',
+    borderWidth: 1, borderColor: AIColors.success + '30',
+  },
+  taxBadgeText: { fontSize: 11, color: AIColors.success, fontWeight: '600' },
+  featuresList: { gap: 3 },
+  featureItem: { fontSize: 12, color: AIColors.textSecondary },
+  tipCard: {
+    flexDirection: 'row', gap: 10, alignItems: 'flex-start',
+    backgroundColor: AIColors.surface, borderRadius: AIRadius.lg,
+    padding: AISpacing.md, borderWidth: 1, borderColor: AIColors.border, marginBottom: 10,
+  },
+  tipNum: {
+    width: 26, height: 26, borderRadius: 13,
+    backgroundColor: AIColors.primary + '20', justifyContent: 'center', alignItems: 'center',
+  },
+  tipNumText: { fontSize: 12, fontWeight: '700', color: AIColors.primary },
+  tipText: { flex: 1, fontSize: 13, color: AIColors.text, lineHeight: 19 },
+  emptyState: { padding: 24, alignItems: 'center' },
+  emptyText: { fontSize: 14, color: AIColors.textSecondary, textAlign: 'center' },
 });

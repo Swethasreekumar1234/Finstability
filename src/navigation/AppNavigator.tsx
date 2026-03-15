@@ -13,15 +13,11 @@ import {
   PhoneLoginScreen,
   OtpVerificationScreen,
   ProfileSetupScreen,
-  DashboardScreen,
   FinancialInputScreen,
-  FinancialHealthScoreScreen,
-  FinancialProfileScreen,
-  GovSchemesScreen,
   TipsScreen,
   RecommendedLoansScreen,
-  InvestmentRecommendationsScreen,
 } from '../screens';
+import TabNavigator from './TabNavigator';
 import { useAuthStore } from '../store/authStore';
 import { AIColors, AITypography, AISpacing, AIRadius, AIShadows } from '../theme/aiTheme';
 
@@ -85,18 +81,14 @@ export default function AppNavigator() {
         <Stack.Screen name="PhoneLogin" component={PhoneLoginScreen} />
         <Stack.Screen name="OtpVerification" component={OtpVerificationScreen} />
         <Stack.Screen name="ProfileSetup" component={ProfileSetupScreen} />
-        <Stack.Screen name="Dashboard" component={DashboardScreen} />
+        <Stack.Screen name="Dashboard" component={TabNavigator} />
         <Stack.Screen 
           name="FinancialInput" 
           component={FinancialInputScreen}
           options={{ animation: 'slide_from_bottom' }}
         />
-        <Stack.Screen name="FinancialHealthScore" component={FinancialHealthScoreScreen} />
-        <Stack.Screen name="FinancialProfile" component={FinancialProfileScreen} />
-        <Stack.Screen name="GovSchemes" component={GovSchemesScreen} />
         <Stack.Screen name="Tips" component={TipsScreen} />
         <Stack.Screen name="RecommendedLoans" component={RecommendedLoansScreen} />
-        <Stack.Screen name="InvestmentRecommendations" component={InvestmentRecommendationsScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

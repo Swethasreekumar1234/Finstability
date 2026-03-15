@@ -134,3 +134,12 @@ export type RootStackParamList = {
   RecommendedLoans: undefined;
   InvestmentRecommendations: undefined;
 };
+
+// Bottom tab navigation param types
+export type TabParamList = {
+  Home: undefined;
+  Health: undefined;
+  Schemes: undefined;
+  Invest: undefined;
+  Profile: undefined;
+};
