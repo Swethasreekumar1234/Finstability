@@ -10,3 +10,4 @@ export { default as GovSchemesScreen } from './GovSchemesScreen';
 export { default as TipsScreen } from './TipsScreen';
 export { default as RecommendedLoansScreen } from './RecommendedLoansScreen';
 export { default as InvestmentRecommendationsScreen } from './InvestmentRecommendationsScreen';
+export { default as AIChatScreen } from './AIChatScreen';
