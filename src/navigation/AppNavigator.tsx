@@ -1,8 +1,3 @@
-/**
- * App Navigator
- * Main navigation configuration for the Finstability app
- */
-
 import React, { useEffect, useState, useRef } from 'react';
 import { ActivityIndicator, View, StyleSheet, Text, Animated } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
@@ -16,6 +11,7 @@ import {
   FinancialInputScreen,
   TipsScreen,
   RecommendedLoansScreen,
+  AIChatScreen,
 } from '../screens';
 import TabNavigator from './TabNavigator';
 import { useAuthStore } from '../store/authStore';
@@ -89,6 +85,11 @@ export default function AppNavigator() {
         />
         <Stack.Screen name="Tips" component={TipsScreen} />
         <Stack.Screen name="RecommendedLoans" component={RecommendedLoansScreen} />
+        <Stack.Screen
+          name="AIChat"
+          component={AIChatScreen}
+          options={{ animation: 'slide_from_bottom' }}
+        />
       </Stack.Navigator>
     </NavigationContainer>
   );
