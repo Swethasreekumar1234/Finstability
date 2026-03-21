@@ -1,7 +1,3 @@
-/**
- * Home Tab - Quick financial overview
- */
-
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
@@ -206,6 +202,16 @@ export default function DashboardScreen() {
           </Animated.View>
         </ScrollView>
       </SafeAreaView>
+
+      {/* Floating AI Chat Button */}
+      <TouchableOpacity
+        style={styles.fabAI}
+        onPress={() => stackNav.navigate('AIChat')}
+        activeOpacity={0.85}
+      >
+        <Text style={styles.fabAIIcon}>✦</Text>
+        <Text style={styles.fabAILabel}>Ask Fin</Text>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -293,4 +299,24 @@ const styles = StyleSheet.create({
   ctaBtnTitle: { fontSize: 15, fontWeight: '700', color: AIColors.background },
   ctaBtnSub: { fontSize: 12, color: AIColors.background + 'CC', marginTop: 2 },
   ctaBtnArrow: { fontSize: 20, color: AIColors.background, fontWeight: '700' },
+
+  fabAI: {
+    position: 'absolute',
+    bottom: 90,
+    right: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: AIColors.primary,
+    borderRadius: 30,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    shadowColor: AIColors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.5,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  fabAIIcon: { fontSize: 16, color: AIColors.background },
+  fabAILabel: { fontSize: 14, fontWeight: '700', color: AIColors.background },
 });
