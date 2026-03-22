@@ -133,6 +133,7 @@ export type RootStackParamList = {
   Tips: undefined;
   RecommendedLoans: undefined;
   InvestmentRecommendations: undefined;
+  AIChat: undefined;
 };
 
 // Bottom tab navigation param types
