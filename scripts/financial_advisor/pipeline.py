@@ -10,20 +10,7 @@ This script orchestrates the entire data pipeline in the correct sequence:
 
 Usage
 -----
-    # Full pipeline (recommended for first run):
     python pipeline.py
-
-    # Skip scraping and use existing raw JSON (fast iteration):
-    python pipeline.py --skip-scrape
-
-    # Skip scraping AND cleaning (jump straight to embedding):
-    python pipeline.py --skip-scrape --skip-clean
-
-    # Only rebuild the FAISS index from an existing chunks file:
-    python pipeline.py --skip-scrape --skip-clean --skip-chunk
-
-    # Verbose logging:
-    python pipeline.py -v
 """
 
 from __future__ import annotations
@@ -33,9 +20,23 @@ import json
 import logging
 import sys
 from pathlib import Path
+import os
+from dotenv import load_dotenv
 
-# Ensure financial_advisor/ is always the package root regardless of how
-# this script is invoked.
+# ---------------------------------------------------------------------------
+# Load API key from .env
+# ---------------------------------------------------------------------------
+# .env should be in the project root (same folder as this pipeline.py)
+load_dotenv('.env')
+api_key = os.getenv("OPENROUTER_API_KEY")
+if not api_key:
+    raise ValueError("API key not found in .env!")
+# Set globally for any library that reads env variables
+os.environ["OPENROUTER_API_KEY"] = api_key
+
+# ---------------------------------------------------------------------------
+# Ensure financial_advisor/ is always the package root
+# ---------------------------------------------------------------------------
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from config import (
@@ -108,18 +109,6 @@ def run_pipeline(
     skip_clean:  bool = False,
     skip_chunk:  bool = False,
 ) -> None:
-    """
-    Execute the pipeline steps that have not been explicitly skipped.
-
-    Parameters
-    ----------
-    skip_scrape
-        Do not re-run the scraper; use the existing raw JSON on disk.
-    skip_clean
-        Do not re-run the cleaner; use the existing processed JSON on disk.
-    skip_chunk
-        Do not re-run chunking; use the existing chunks JSON on disk.
-    """
     logger = logging.getLogger(__name__)
     logger.info("╔══════════════════════════════════════════════════╗")
     logger.info("║  Indian Financial Schemes RAG Pipeline           ║")
@@ -136,8 +125,7 @@ def run_pipeline(
     else:
         if not RAW_SCHEMES_FILE.exists():
             logger.error(
-                "--skip-scrape was set but %s does not exist. "
-                "Remove the flag or run without it first.",
+                "--skip-scrape was set but %s does not exist. Remove the flag or run without it first.",
                 RAW_SCHEMES_FILE,
             )
             sys.exit(1)
@@ -149,9 +137,7 @@ def run_pipeline(
         logger.info("   ✔ Cleaned %d scheme records.", len(processed_schemes))
     else:
         if not PROCESSED_SCHEMES_FILE.exists():
-            logger.error(
-                "--skip-clean set but %s does not exist.", PROCESSED_SCHEMES_FILE
-            )
+            logger.error("--skip-clean set but %s does not exist.", PROCESSED_SCHEMES_FILE)
             sys.exit(1)
         logger.info("   ↷ Skipping clean – using %s", PROCESSED_SCHEMES_FILE)
 
@@ -161,14 +147,11 @@ def run_pipeline(
         logger.info("   ✔ Created %d text chunks.", len(chunks))
     else:
         if not CHUNKS_FILE.exists():
-            logger.error(
-                "--skip-chunk set but %s does not exist.", CHUNKS_FILE
-            )
+            logger.error("--skip-chunk set but %s does not exist.", CHUNKS_FILE)
             sys.exit(1)
         logger.info("   ↷ Skipping chunking – using %s", CHUNKS_FILE)
 
-    # Step 4 – Embed (always runs unless all previous steps were skipped AND
-    # the user explicitly adds a future --skip-embed flag)
+    # Step 4 – Embed
     step_embed(chunks)
 
     logger.info("╔══════════════════════════════════════════════════╗")
@@ -180,33 +163,16 @@ def run_pipeline(
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
-
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Run the Indian Financial Schemes RAG pipeline.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__,
     )
-    parser.add_argument(
-        "--skip-scrape",
-        action="store_true",
-        help="Use existing raw JSON instead of re-scraping.",
-    )
-    parser.add_argument(
-        "--skip-clean",
-        action="store_true",
-        help="Use existing processed JSON instead of re-cleaning.",
-    )
-    parser.add_argument(
-        "--skip-chunk",
-        action="store_true",
-        help="Use existing chunks JSON instead of re-chunking.",
-    )
-    parser.add_argument(
-        "-v", "--verbose",
-        action="store_true",
-        help="Enable DEBUG-level logging.",
-    )
+    parser.add_argument("--skip-scrape", action="store_true", help="Use existing raw JSON instead of re-scraping.")
+    parser.add_argument("--skip-clean", action="store_true", help="Use existing processed JSON instead of re-cleaning.")
+    parser.add_argument("--skip-chunk", action="store_true", help="Use existing chunks JSON instead of re-chunking.")
+    parser.add_argument("-v", "--verbose", action="store_true", help="Enable DEBUG-level logging.")
     args = parser.parse_args()
 
     _setup_logging(args.verbose)
