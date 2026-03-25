@@ -120,6 +120,33 @@ export enum OtpState {
 }
 
 // Navigation param types
+// User-defined financial goal (stored in AsyncStorage)
+export interface UserGoal {
+  id: string;
+  type: FinancialGoal;
+  label: string;
+  icon: string;
+  targetAmount: number;
+  currentAmount: number;
+  monthlyContribution: number;
+  targetDate: string; // ISO date
+  createdAt: string;  // ISO date
+  color: string;
+}
+
+// Financial tip for the Tips feed
+export interface FinancialTip {
+  id: string;
+  title: string;
+  description: string;
+  category: 'budgeting' | 'saving' | 'investing' | 'debt';
+  impact: 'high' | 'medium' | 'low';
+  timeframe: 'daily' | 'weekly' | 'long_term';
+  tags: string[];
+  isExpanded?: boolean;
+}
+
+// Navigation param types
 export type RootStackParamList = {
   Login: undefined;
   PhoneLogin: undefined;
@@ -127,20 +154,16 @@ export type RootStackParamList = {
   ProfileSetup: undefined;
   Dashboard: undefined;
   FinancialInput: undefined;
-  FinancialHealthScore: undefined;
-  FinancialProfile: undefined;
-  GovSchemes: undefined;
   Tips: undefined;
-  RecommendedLoans: undefined;
   InvestmentRecommendations: undefined;
   AIChat: undefined;
 };
 
-// Bottom tab navigation param types
+// Bottom tab navigation param types  (Home · Health · Goals · Benefits · Profile)
 export type TabParamList = {
   Home: undefined;
   Health: undefined;
-  Schemes: undefined;
-  Invest: undefined;
+  Goals: undefined;
+  Benefits: undefined;
   Profile: undefined;
 };

@@ -1,6 +1,6 @@
 /**
  * Bottom Tab Navigator
- * Five-tab layout: Home · Health · Schemes · Invest · Profile
+ * Five-tab layout: Home · Health · Goals · Benefits · Profile
  */
 
 import React from 'react';
@@ -13,8 +13,8 @@ import { AIColors, AIRadius, AITypography } from '../theme/aiTheme';
 // Screens
 import DashboardScreen from '../screens/DashboardScreen';
 import FinancialHealthScoreScreen from '../screens/FinancialHealthScoreScreen';
-import GovSchemesScreen from '../screens/GovSchemesScreen';
-import InvestmentRecommendationsScreen from '../screens/InvestmentRecommendationsScreen';
+import GoalsScreen from '../screens/GoalsScreen';
+import BenefitsScreen from '../screens/BenefitsScreen';
 import FinancialProfileScreen from '../screens/FinancialProfileScreen';
 
 const Tab = createBottomTabNavigator<TabParamList>();
@@ -22,11 +22,11 @@ const Tab = createBottomTabNavigator<TabParamList>();
 type IoniconsName = React.ComponentProps<typeof Ionicons>['name'];
 
 const TAB_ICONS: Record<keyof TabParamList, { active: IoniconsName; inactive: IoniconsName }> = {
-  Home:    { active: 'home',              inactive: 'home-outline' },
-  Health:  { active: 'heart',             inactive: 'heart-outline' },
-  Schemes: { active: 'shield-checkmark',  inactive: 'shield-checkmark-outline' },
-  Invest:  { active: 'trending-up',       inactive: 'trending-up-outline' },
-  Profile: { active: 'person',            inactive: 'person-outline' },
+  Home:     { active: 'home',             inactive: 'home-outline' },
+  Health:   { active: 'heart',            inactive: 'heart-outline' },
+  Goals:    { active: 'flag',             inactive: 'flag-outline' },
+  Benefits: { active: 'shield-checkmark', inactive: 'shield-checkmark-outline' },
+  Profile:  { active: 'person',           inactive: 'person-outline' },
 };
 
 export default function TabNavigator() {
@@ -52,8 +52,8 @@ export default function TabNavigator() {
     >
       <Tab.Screen name="Home"    component={DashboardScreen}               options={{ tabBarLabel: 'Home' }} />
       <Tab.Screen name="Health"  component={FinancialHealthScoreScreen}    options={{ tabBarLabel: 'Health' }} />
-      <Tab.Screen name="Schemes" component={GovSchemesScreen}              options={{ tabBarLabel: 'Schemes' }} />
-      <Tab.Screen name="Invest"  component={InvestmentRecommendationsScreen} options={{ tabBarLabel: 'Invest' }} />
+      <Tab.Screen name="Goals"    component={GoalsScreen}                   options={{ tabBarLabel: 'Goals' }} />
+      <Tab.Screen name="Benefits" component={BenefitsScreen}               options={{ tabBarLabel: 'Benefits' }} />
       <Tab.Screen name="Profile" component={FinancialProfileScreen}        options={{ tabBarLabel: 'Profile' }} />
     </Tab.Navigator>
   );

@@ -1,11 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../types';
 import { AIColors, AIRadius, AISpacing, AITypography } from '../theme/aiTheme';
-
-type Props = NativeStackScreenProps<RootStackParamList, 'RecommendedLoans'>;
 
 const loans = [
   { name: 'Education Loan', range: '8.5% - 11.5%', why: 'Useful for higher studies with longer tenures.' },
@@ -14,7 +10,7 @@ const loans = [
   { name: 'Personal Loan', range: '11% - 22%', why: 'Best only for urgent short-term requirements.' },
 ];
 
-export default function RecommendedLoansScreen({}: Props) {
+export default function RecommendedLoansScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
