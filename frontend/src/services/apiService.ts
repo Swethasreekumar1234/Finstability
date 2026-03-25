@@ -10,6 +10,13 @@ const API_BASE = 'http://localhost:8000';
 export interface BackendProfile {
   user_id?: string;
   name?: string;
+  full_name?: string;
+  display_name?: string;
+  email?: string;
+  phone_number?: string;
+  user_type?: string;
+  risk_tolerance?: string;
+  firebase_uid?: string;
   age: number;
   gender: string;
   state: string;
@@ -19,6 +26,10 @@ export interface BackendProfile {
   monthly_expenses: number;
   total_savings: number;
   total_debts: number;
+  existing_loans?: number;
+  financial_goals?: string[];
+  investment_experience?: number;
+  updated_at_client?: string;
   family_size: number;
   has_land?: boolean;
 }

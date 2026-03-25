@@ -6,6 +6,13 @@ from pydantic import BaseModel
 class UserProfile(BaseModel):
     user_id: Optional[str] = None
     name: Optional[str] = None
+    full_name: Optional[str] = None
+    display_name: Optional[str] = None
+    email: Optional[str] = None
+    phone_number: Optional[str] = None
+    user_type: Optional[str] = None
+    risk_tolerance: Optional[str] = None
+    firebase_uid: Optional[str] = None
     age: int = 25
     gender: str = "male"          # male / female / other
     state: str = "Delhi"
@@ -15,7 +22,11 @@ class UserProfile(BaseModel):
     monthly_expenses: float = 0.0
     total_savings: float = 0.0
     total_debts: float = 0.0
+    existing_loans: Optional[float] = None
     family_size: int = 1
+    financial_goals: Optional[List[str]] = None
+    investment_experience: Optional[int] = None
+    updated_at_client: Optional[str] = None
     has_land: bool = False
     caste_category: Optional[str] = None  # general / obc / sc / st
 

@@ -15,6 +15,7 @@ import {
   signOutUser,
   setPhoneForVerification,
 } from '../config/firebase';
+import { apiService } from '../services/apiService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface AuthState {
@@ -326,6 +327,33 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       } catch (firestoreError) {
         console.warn('Firestore save skipped:', firestoreError);
         // Continue anyway - local storage is saved
+      }
+
+      // Sync to backend MongoDB (non-blocking for UX)
+      try {
+        await apiService.saveProfile({
+          user_id: uid,
+          firebase_uid: uid,
+          name: profileData.fullName,
+          full_name: profileData.fullName,
+          display_name: profileData.fullName,
+          email: profileData.email,
+          phone_number: profileData.phoneNumber,
+          user_type: profileData.userType,
+          risk_tolerance: profileData.riskTolerance,
+          employment_type: 'salaried',
+          monthly_income: profileData.monthlyIncome,
+          monthly_expenses: 0,
+          total_savings: 0,
+          total_debts: 0,
+          family_size: 1,
+          age: 25,
+          gender: 'other',
+          state: 'Delhi',
+          occupation: 'salaried',
+        });
+      } catch (mongoError) {
+        console.warn('Mongo profile sync skipped:', mongoError);
       }
       
       // Update local state

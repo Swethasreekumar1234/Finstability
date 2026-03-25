@@ -15,12 +15,16 @@ async def lifespan(app: FastAPI):
     from database.seed_schemes import seed
 
     logger.info("Starting Finstability API…")
+    
+    # MongoDB is optional for dev; API works without it but profile persistence disabled
+    db_connected = False
     try:
         await connect_db()
         logger.info("MongoDB connected.")
         await seed()
+        db_connected = True
     except Exception as exc:
-        logger.error("MongoDB unavailable: %s — continuing without DB.", exc)
+        logger.warning("MongoDB unavailable: %s — profiles will not persist", exc)
 
     try:
         await build_index()
@@ -30,8 +34,9 @@ async def lifespan(app: FastAPI):
 
     yield
 
-    from database.mongodb import close_db
-    await close_db()
+    if db_connected:
+        from database.mongodb import close_db
+        await close_db()
     logger.info("Finstability API shut down.")
 
 

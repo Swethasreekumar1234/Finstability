@@ -29,6 +29,8 @@ import {
   RootStackParamList,
 } from '../types';
 import { AIColors, AIRadius, AISpacing, AIShadows } from '../theme/aiTheme';
+import { apiService } from '../services/apiService';
+import { useAuthStore } from '../store/authStore';
 
 const FINANCIAL_PROFILE_KEY = 'financial_profile';
 
@@ -56,6 +58,7 @@ const RISK_OPTIONS = [RiskTolerance.LOW, RiskTolerance.MODERATE, RiskTolerance.H
 const GOAL_OPTIONS = Object.values(FinancialGoal);
 
 export default function FinancialInputScreen({ navigation }: Props) {
+  const { currentUser, firebaseUid } = useAuthStore();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -120,6 +123,41 @@ export default function FinancialInputScreen({ navigation }: Props) {
         updatedAt: new Date().toISOString(),
       };
       await AsyncStorage.setItem(FINANCIAL_PROFILE_KEY, JSON.stringify(profile));
+
+      // Sync full financial profile to backend MongoDB using the same user document.
+      try {
+        const uid = firebaseUid || await AsyncStorage.getItem('firebaseUid') || `local-${Date.now()}`;
+        const displayName = currentUser?.displayName || currentUser?.fullName || '';
+
+        await apiService.saveProfile({
+          user_id: uid,
+          firebase_uid: uid,
+          name: displayName,
+          full_name: currentUser?.fullName || displayName,
+          display_name: displayName,
+          email: currentUser?.email || '',
+          phone_number: currentUser?.phoneNumber || '',
+          user_type: currentUser?.userType || '',
+          risk_tolerance: riskTolerance,
+          employment_type: employmentType.toLowerCase(),
+          monthly_income: Number(monthlyIncome) || 0,
+          monthly_expenses: Number(monthlyExpenses) || 0,
+          total_savings: Number(totalSavings) || 0,
+          total_debts: Number(existingLoans) || 0,
+          existing_loans: Number(existingLoans) || 0,
+          financial_goals: goals,
+          investment_experience: investmentExperience,
+          updated_at_client: new Date().toISOString(),
+          family_size: 1,
+          age: 25,
+          gender: 'other',
+          state: 'Delhi',
+          occupation: 'salaried',
+        });
+      } catch (mongoError) {
+        console.warn('Mongo financial profile sync skipped:', mongoError);
+      }
+
       Alert.alert('Profile saved', 'Your financial profile has been updated.', [
         { text: 'OK', onPress: () => navigation.goBack() },
       ]);
