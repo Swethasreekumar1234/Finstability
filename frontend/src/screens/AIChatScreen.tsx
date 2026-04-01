@@ -5,6 +5,7 @@ import {
   SafeAreaView, Animated,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useNavigation } from '@react-navigation/native';
 import { useAuthStore } from '../store/authStore';
 import { FinancialProfile } from '../types';
 import { sendMessage, getSuggestedPrompts, ChatMessage } from '../services/OpenrouterService';
@@ -177,6 +178,7 @@ const TypingIndicator: React.FC = () => {
 };
 
 export default function AIChatScreen() {
+  const navigation = useNavigation();
   const { currentUser: user } = useAuthStore();
   const [profile, setProfile] = useState<FinancialProfile | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -233,6 +235,9 @@ export default function AIChatScreen() {
       <GridBackdrop />
       <View style={styles.header}>
         <View style={styles.headerLeft}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+            <Text style={styles.backButtonText}>←</Text>
+          </TouchableOpacity>
           <View style={styles.headerAvatar}>
             <Text style={styles.headerAvatarText}>F</Text>
             <View style={styles.onlineDot} />
@@ -313,6 +318,8 @@ const styles = StyleSheet.create({
   tableCell: { ...AITypography.bodySmall, flex: 1, paddingRight: 6 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: AISpacing.lg, paddingVertical: AISpacing.md, borderBottomWidth: 1, borderBottomColor: AIColors.border, backgroundColor: AIColors.surface },
   headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  backButton: { width: 40, height: 40, borderRadius: 20, backgroundColor: AIColors.primary + '15', justifyContent: 'center', alignItems: 'center', marginRight: 4 },
+  backButtonText: { ...AITypography.h3, color: AIColors.primary, fontSize: 20 },
   headerAvatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: AIColors.primary, justifyContent: 'center', alignItems: 'center' },
   headerAvatarText: { ...AITypography.h3, color: AIColors.background },
   onlineDot: { position: 'absolute', bottom: 1, right: 1, width: 10, height: 10, borderRadius: 5, backgroundColor: '#4ADE80', borderWidth: 2, borderColor: AIColors.surface },
