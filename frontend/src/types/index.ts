@@ -154,6 +154,7 @@ export type RootStackParamList = {
   ProfileSetup: undefined;
   Dashboard: undefined;
   FinancialInput: undefined;
+  FinancialHealth: undefined;
   Tips: undefined;
   InvestmentRecommendations: undefined;
   AIChat: undefined;

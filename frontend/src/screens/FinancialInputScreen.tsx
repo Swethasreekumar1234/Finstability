@@ -28,9 +28,10 @@ import {
   RiskToleranceLabels,
   RootStackParamList,
 } from '../types';
-import { AIColors, AIRadius, AISpacing, AIShadows } from '../theme/aiTheme';
+import { AIColors, AIRadius, AISpacing, AIShadows, AITypography } from '../theme/aiTheme';
 import { apiService } from '../services/apiService';
 import { useAuthStore } from '../store/authStore';
+import { GridBackdrop, ScreenHeader } from '../components/ui';
 
 const FINANCIAL_PROFILE_KEY = 'financial_profile';
 
@@ -178,10 +179,15 @@ export default function FinancialInputScreen({ navigation }: Props) {
 
   return (
     <SafeAreaView style={styles.safe}>
+      <GridBackdrop />
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-          <Text style={styles.title}>Update Financial Profile</Text>
-          <Text style={styles.subtitle}>Complete these 5 sections for better recommendations.</Text>
+          <ScreenHeader
+            title="Update Financial Profile"
+            subtitle="Complete these 5 sections for better recommendations."
+            onBack={() => navigation.goBack()}
+            backLabel="Back"
+          />
 
           <View style={styles.progressTrack}><View style={[styles.progressFill, { width: `${Math.round(completion * 100)}%` }]} /></View>
           <Text style={styles.progressText}>{Math.round(completion * 100)}% complete</Text>
@@ -307,8 +313,6 @@ const styles = StyleSheet.create({
   content: { padding: AISpacing.md },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   loadingText: { color: AIColors.textSecondary, fontSize: 14 },
-  title: { fontSize: 28, fontWeight: '900', color: AIColors.text, marginBottom: 4 },
-  subtitle: { fontSize: 13, color: AIColors.textSecondary, marginBottom: AISpacing.md },
   progressTrack: {
     height: 8,
     borderRadius: 999,
@@ -317,7 +321,7 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   progressFill: { height: 8, borderRadius: 999, backgroundColor: AIColors.primary },
-  progressText: { fontSize: 11, color: AIColors.textMuted, marginBottom: AISpacing.sm },
+  progressText: { ...AITypography.labelSmall, color: AIColors.textMuted, marginBottom: AISpacing.sm },
   stepRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: AISpacing.md },
   stepPill: {
     width: 36,
@@ -330,7 +334,7 @@ const styles = StyleSheet.create({
     backgroundColor: AIColors.surface,
   },
   stepPillActive: { borderColor: AIColors.primary, backgroundColor: AIColors.primaryDim },
-  stepText: { color: AIColors.textSecondary, fontWeight: '700' },
+  stepText: { ...AITypography.bodySmall, color: AIColors.textSecondary },
   stepTextActive: { color: AIColors.primary },
   card: {
     backgroundColor: AIColors.surface,
@@ -341,8 +345,8 @@ const styles = StyleSheet.create({
     marginBottom: AISpacing.md,
     ...AIShadows.sm,
   },
-  sectionTitle: { fontSize: 17, fontWeight: '700', color: AIColors.text, marginBottom: AISpacing.sm },
-  inputLabel: { fontSize: 12, color: AIColors.textSecondary, marginBottom: 6, marginTop: 6 },
+  sectionTitle: { ...AITypography.h3, color: AIColors.text, marginBottom: AISpacing.sm },
+  inputLabel: { ...AITypography.label, color: AIColors.textSecondary, marginBottom: 6, marginTop: 6 },
   input: {
     backgroundColor: AIColors.backgroundSecondary,
     borderWidth: 1,
@@ -351,9 +355,9 @@ const styles = StyleSheet.create({
     color: AIColors.text,
     paddingHorizontal: AISpacing.sm,
     paddingVertical: 10,
-    fontSize: 15,
+    ...AITypography.body,
   },
-  helper: { fontSize: 12, color: AIColors.textMuted, marginTop: 8, lineHeight: 18 },
+  helper: { ...AITypography.bodySmall, color: AIColors.textMuted, marginTop: 8 },
   wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 },
   chip: {
     borderRadius: AIRadius.full,
@@ -364,9 +368,9 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
   },
   chipActive: { borderColor: AIColors.primary, backgroundColor: AIColors.primaryDim },
-  chipText: { fontSize: 11, color: AIColors.textSecondary, fontWeight: '600' },
+  chipText: { ...AITypography.labelSmall, color: AIColors.textSecondary },
   chipTextActive: { color: AIColors.primary },
-  sliderValue: { fontSize: 26, color: AIColors.primary, fontWeight: '900', marginBottom: 4 },
+  sliderValue: { ...AITypography.displaySmall, color: AIColors.primary, marginBottom: 4 },
   navRow: { flexDirection: 'row', gap: AISpacing.sm },
   secondaryBtn: {
     flex: 1,
@@ -378,7 +382,7 @@ const styles = StyleSheet.create({
     paddingVertical: 13,
     backgroundColor: AIColors.surface,
   },
-  secondaryText: { fontSize: 13, color: AIColors.textSecondary, fontWeight: '700' },
+  secondaryText: { ...AITypography.buttonSmall, color: AIColors.textSecondary },
   primaryBtn: {
     flex: 1,
     alignItems: 'center',
@@ -387,6 +391,6 @@ const styles = StyleSheet.create({
     paddingVertical: 13,
     backgroundColor: AIColors.primary,
   },
-  primaryText: { fontSize: 13, color: AIColors.background, fontWeight: '800' },
+  primaryText: { ...AITypography.buttonSmall, color: AIColors.background },
   btnDisabled: { opacity: 0.5 },
 });

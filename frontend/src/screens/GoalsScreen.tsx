@@ -11,21 +11,21 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { FinancialGoal, FinancialGoalLabels, FinancialProfile, UserGoal } from '../types';
-import { AIColors, AISpacing, AIRadius, AIShadows } from '../theme/aiTheme';
+import { AIColors, AISpacing, AIRadius, AIShadows, AISchemeCategoryColors } from '../theme/aiTheme';
 import { ProgressBar } from '../components/ai';
 
 const PROFILE_KEY = 'financial_profile';
 const GOALS_KEY   = 'user_goals';
 
 const GOAL_META: Record<FinancialGoal, { icon: string; color: string; defaultTarget: number }> = {
-  [FinancialGoal.EMERGENCY_FUND]: { icon: '🛡️', color: '#10B981', defaultTarget: 150000 },
-  [FinancialGoal.HOME_PURCHASE]:  { icon: '🏠', color: '#3B82F6', defaultTarget: 5000000 },
-  [FinancialGoal.EDUCATION]:      { icon: '🎓', color: '#8B5CF6', defaultTarget: 1000000 },
-  [FinancialGoal.RETIREMENT]:     { icon: '🌅', color: '#F59E0B', defaultTarget: 10000000 },
-  [FinancialGoal.INVESTMENT]:     { icon: '📈', color: '#2EE6A6', defaultTarget: 500000 },
-  [FinancialGoal.DEBT_FREE]:      { icon: '🔓', color: '#EF4444', defaultTarget: 200000 },
-  [FinancialGoal.TRAVEL]:         { icon: '✈️', color: '#EC4899', defaultTarget: 200000 },
-  [FinancialGoal.BUSINESS]:       { icon: '💼', color: '#F97316', defaultTarget: 2000000 },
+  [FinancialGoal.EMERGENCY_FUND]: { icon: '🛡️', color: AIColors.primary, defaultTarget: 150000 },
+  [FinancialGoal.HOME_PURCHASE]:  { icon: '🏠', color: AIColors.secondary, defaultTarget: 5000000 },
+  [FinancialGoal.EDUCATION]:      { icon: '🎓', color: AISchemeCategoryColors.pension, defaultTarget: 1000000 },
+  [FinancialGoal.RETIREMENT]:     { icon: '🌅', color: AIColors.warning, defaultTarget: 10000000 },
+  [FinancialGoal.INVESTMENT]:     { icon: '📈', color: AIColors.primary, defaultTarget: 500000 },
+  [FinancialGoal.DEBT_FREE]:      { icon: '🔓', color: AIColors.error, defaultTarget: 200000 },
+  [FinancialGoal.TRAVEL]:         { icon: '✈️', color: AISchemeCategoryColors.scholarship, defaultTarget: 200000 },
+  [FinancialGoal.BUSINESS]:       { icon: '💼', color: AISchemeCategoryColors.subsidy, defaultTarget: 2000000 },
 };
 
 function fmt(n: number): string {

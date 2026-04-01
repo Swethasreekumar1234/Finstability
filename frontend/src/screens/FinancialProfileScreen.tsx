@@ -17,7 +17,8 @@ import {
   UserTypeLabels,
 } from '../types';
 import { useAuthStore } from '../store/authStore';
-import { AIColors, AIRadius, AISpacing, AIShadows } from '../theme/aiTheme';
+import { AIColors, AIRadius, AISpacing, AIShadows, AITypography } from '../theme/aiTheme';
+import { GridBackdrop, ScreenHeader } from '../components/ui';
 
 const FINANCIAL_PROFILE_KEY = 'financial_profile';
 type StackNav = NativeStackNavigationProp<RootStackParamList>;
@@ -67,7 +68,10 @@ export default function FinancialProfileScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
+      <GridBackdrop />
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <ScreenHeader title="Profile" subtitle="Your financial identity and preferences." />
+
         <View style={styles.heroCard}>
           <View style={styles.avatar}>
             <Text style={styles.avatarText}>{user?.displayName?.charAt(0)?.toUpperCase() || 'U'}</Text>
@@ -151,9 +155,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  avatarText: { fontSize: 30, fontWeight: '900', color: AIColors.background },
-  name: { fontSize: 21, fontWeight: '800', color: AIColors.text, marginBottom: 2 },
-  phone: { fontSize: 13, color: AIColors.textSecondary, marginBottom: 8 },
+  avatarText: { ...AITypography.displaySmall, color: AIColors.background },
+  name: { ...AITypography.h2, color: AIColors.text, marginBottom: 2 },
+  phone: { ...AITypography.bodySmall, color: AIColors.textSecondary, marginBottom: 8 },
   badge: {
     alignSelf: 'flex-start',
     backgroundColor: AIColors.primaryDim,
@@ -163,8 +167,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: AISpacing.sm,
     paddingVertical: 4,
   },
-  badgeText: { fontSize: 11, color: AIColors.primary, fontWeight: '700' },
-  sectionTitle: { fontSize: 16, fontWeight: '700', color: AIColors.text, marginBottom: AISpacing.sm },
+  badgeText: { ...AITypography.labelSmall, color: AIColors.primary },
+  sectionTitle: { ...AITypography.h3, color: AIColors.text, marginBottom: AISpacing.sm },
   card: {
     backgroundColor: AIColors.surface,
     borderWidth: 1,
@@ -174,8 +178,8 @@ const styles = StyleSheet.create({
     marginBottom: AISpacing.md,
   },
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  rowLabel: { fontSize: 13, color: AIColors.textSecondary },
-  rowValue: { fontSize: 13, color: AIColors.text, fontWeight: '600', maxWidth: '65%', textAlign: 'right' },
+  rowLabel: { ...AITypography.bodySmall, color: AIColors.textSecondary },
+  rowValue: { ...AITypography.bodySmall, color: AIColors.text, maxWidth: '65%', textAlign: 'right' },
   divider: { height: 1, backgroundColor: AIColors.border, marginVertical: 10 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: AISpacing.sm, marginBottom: AISpacing.md },
   statCard: {
@@ -186,9 +190,9 @@ const styles = StyleSheet.create({
     borderRadius: AIRadius.lg,
     padding: AISpacing.sm,
   },
-  statLabel: { fontSize: 11, color: AIColors.textMuted, marginBottom: 4 },
-  statValue: { fontSize: 15, color: AIColors.text, fontWeight: '700' },
-  insight: { fontSize: 13, color: AIColors.textSecondary, marginBottom: 6 },
+  statLabel: { ...AITypography.labelSmall, color: AIColors.textMuted, marginBottom: 4 },
+  statValue: { ...AITypography.bodyLarge, color: AIColors.text },
+  insight: { ...AITypography.bodySmall, color: AIColors.textSecondary, marginBottom: 6 },
   goalWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   goalPill: {
     backgroundColor: AIColors.backgroundSecondary,
@@ -198,12 +202,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: AISpacing.sm,
     paddingVertical: 5,
   },
-  goalText: { fontSize: 11, color: AIColors.textSecondary },
+  goalText: { ...AITypography.labelSmall, color: AIColors.textSecondary },
   cta: {
     backgroundColor: AIColors.primary,
     borderRadius: AIRadius.xl,
     paddingVertical: 14,
     alignItems: 'center',
   },
-  ctaText: { color: AIColors.background, fontSize: 14, fontWeight: '800' },
+  ctaText: { ...AITypography.button, color: AIColors.background },
 });

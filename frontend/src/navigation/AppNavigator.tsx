@@ -14,8 +14,10 @@ import {
   OtpVerificationScreen,
   ProfileSetupScreen,
   FinancialInputScreen,
+  FinancialHealthScoreScreen,
   TipsScreen,
   InvestmentRecommendationsScreen,
+  AIChatScreen,
 } from '../screens';
 import TabNavigator from './TabNavigator';
 import { useAuthStore } from '../store/authStore';
@@ -87,10 +89,20 @@ export default function AppNavigator() {
           component={FinancialInputScreen}
           options={{ animation: 'slide_from_bottom' }}
         />
+        <Stack.Screen
+          name="FinancialHealth"
+          component={FinancialHealthScoreScreen}
+          options={{ animation: 'slide_from_right' }}
+        />
         <Stack.Screen name="Tips" component={TipsScreen} />
         <Stack.Screen
           name="InvestmentRecommendations"
           component={InvestmentRecommendationsScreen}
+          options={{ animation: 'slide_from_bottom' }}
+        />
+        <Stack.Screen
+          name="AIChat"
+          component={AIChatScreen}
           options={{ animation: 'slide_from_bottom' }}
         />
       </Stack.Navigator>

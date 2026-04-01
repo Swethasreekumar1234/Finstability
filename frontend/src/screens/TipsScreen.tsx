@@ -5,8 +5,12 @@
 import React, { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { FinancialTip } from '../types';
-import { AIColors, AIRadius, AISpacing } from '../theme/aiTheme';
+import { RootStackParamList } from '../types';
+import { AIColors, AIRadius, AISpacing, AITypography } from '../theme/aiTheme';
+import { GridBackdrop, ScreenHeader } from '../components/ui';
 
 const ALL_TIPS: FinancialTip[] = [
   {
@@ -74,6 +78,7 @@ function impactColor(v: FinancialTip['impact']): string {
 }
 
 export default function TipsScreen() {
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [filter, setFilter] = useState<'all' | 'daily' | 'weekly' | 'long_term'>('all');
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
@@ -84,9 +89,14 @@ export default function TipsScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
+      <GridBackdrop />
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <Text style={styles.title}>Smart Tips</Text>
-        <Text style={styles.subtitle}>Actionable habits for daily, weekly, and long-term financial progress.</Text>
+        <ScreenHeader
+          title="Smart Tips"
+          subtitle="Actionable habits for daily, weekly, and long-term financial progress."
+          onBack={() => navigation.goBack()}
+          backLabel="Back"
+        />
 
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterRow}>
           {FILTERS.map((f) => {
@@ -148,8 +158,6 @@ export default function TipsScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: AIColors.background },
   content: { padding: AISpacing.md },
-  title: { fontSize: 28, color: AIColors.text, fontWeight: '900', marginBottom: 4 },
-  subtitle: { fontSize: 13, color: AIColors.textSecondary, marginBottom: AISpacing.md },
   filterRow: { marginBottom: AISpacing.md },
   filterChip: {
     borderRadius: AIRadius.full,
@@ -161,7 +169,7 @@ const styles = StyleSheet.create({
     marginRight: AISpacing.sm,
   },
   filterChipActive: { borderColor: AIColors.primary, backgroundColor: AIColors.primaryDim },
-  filterText: { fontSize: 12, color: AIColors.textSecondary, fontWeight: '600' },
+  filterText: { ...AITypography.label, color: AIColors.textSecondary },
   filterTextActive: { color: AIColors.primary },
   card: {
     backgroundColor: AIColors.surface,
@@ -180,13 +188,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  indexText: { color: AIColors.primary, fontSize: 12, fontWeight: '700' },
-  cardTitle: { color: AIColors.text, fontSize: 15, fontWeight: '700', marginBottom: 6 },
+  indexText: { ...AITypography.label, color: AIColors.primary },
+  cardTitle: { ...AITypography.bodyLarge, color: AIColors.text, marginBottom: 6 },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   impactPill: { borderRadius: AIRadius.sm, paddingHorizontal: 8, paddingVertical: 3 },
-  impactText: { fontSize: 10, fontWeight: '700', letterSpacing: 0.3 },
-  timeframe: { fontSize: 11, color: AIColors.textMuted },
-  description: { fontSize: 13, color: AIColors.textSecondary, lineHeight: 19, marginBottom: 8 },
+  impactText: { ...AITypography.labelSmall, letterSpacing: 0.3 },
+  timeframe: { ...AITypography.labelSmall, color: AIColors.textMuted },
+  description: { ...AITypography.bodySmall, color: AIColors.textSecondary, marginBottom: 8 },
   tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8 },
   tagPill: {
     borderRadius: AIRadius.full,
@@ -196,6 +204,6 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     backgroundColor: AIColors.backgroundSecondary,
   },
-  tagText: { fontSize: 10, color: AIColors.textSecondary, fontWeight: '600' },
-  toggleText: { fontSize: 11, color: AIColors.textMuted },
+  tagText: { ...AITypography.labelSmall, color: AIColors.textSecondary },
+  toggleText: { ...AITypography.bodySmall, color: AIColors.textMuted },
 });

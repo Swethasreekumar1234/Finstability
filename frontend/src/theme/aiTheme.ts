@@ -5,19 +5,19 @@
 
 export const AIColors = {
   // Background layers
-  background: '#0B0F1A',
-  backgroundSecondary: '#0F1420',
-  surface: '#121826',
-  surfaceLight: '#1A2235',
+  background: '#0E131B',
+  backgroundSecondary: '#141B24',
+  surface: '#1A2230',
+  surfaceLight: '#222D3E',
   surfaceGlass: 'rgba(18, 24, 38, 0.8)',
   
   // Accent colors
-  primary: '#2EE6A6',        // Neon teal
-  primaryDim: 'rgba(46, 230, 166, 0.15)',
-  primaryGlow: 'rgba(46, 230, 166, 0.4)',
-  secondary: '#3B82F6',      // Electric blue
-  secondaryDim: 'rgba(59, 130, 246, 0.15)',
-  secondaryGlow: 'rgba(59, 130, 246, 0.4)',
+  primary: '#10B981',        // Financial trust green
+  primaryDim: 'rgba(16, 185, 129, 0.16)',
+  primaryGlow: 'rgba(16, 185, 129, 0.28)',
+  secondary: '#4A7CFF',
+  secondaryDim: 'rgba(74, 124, 255, 0.14)',
+  secondaryGlow: 'rgba(74, 124, 255, 0.28)',
   
   // Semantic colors
   success: '#10B981',
@@ -28,24 +28,33 @@ export const AIColors = {
   errorDim: 'rgba(239, 68, 68, 0.15)',
   
   // Text colors
-  text: '#E5E7EB',
-  textSecondary: '#9CA3AF',
-  textMuted: '#6B7280',
-  textDim: '#4B5563',
+  text: '#E6EDF7',
+  textSecondary: '#A6B2C2',
+  textMuted: '#7C8A9C',
+  textDim: '#5F6D80',
   
   // Border colors
   border: 'rgba(255, 255, 255, 0.08)',
   borderLight: 'rgba(255, 255, 255, 0.12)',
-  borderGlow: 'rgba(46, 230, 166, 0.3)',
+  borderGlow: 'rgba(16, 185, 129, 0.22)',
   
   // Overlay
   overlay: 'rgba(0, 0, 0, 0.6)',
   
   // Gradients (as arrays for LinearGradient)
-  gradientPrimary: ['#2EE6A6', '#10B981'],
-  gradientSecondary: ['#3B82F6', '#6366F1'],
-  gradientDark: ['#0B0F1A', '#121826'],
+  gradientPrimary: ['#10B981', '#0F9F70'],
+  gradientSecondary: ['#4A7CFF', '#5368D8'],
+  gradientDark: ['#0E131B', '#1A2230'],
   gradientGlass: ['rgba(18, 24, 38, 0.9)', 'rgba(18, 24, 38, 0.7)'],
+};
+
+export const AISchemeCategoryColors: Record<string, string> = {
+  subsidy: AIColors.warning,
+  pension: '#7C6CF0',
+  insurance: AIColors.secondary,
+  grant: AIColors.primary,
+  loan_support: AIColors.error,
+  scholarship: '#E56FA1',
 };
 
 export const AISpacing = {
@@ -105,74 +114,82 @@ export const AIShadows = {
   },
 };
 
+export const AITypefaces = {
+  display: 'SpaceGrotesk_700Bold',
+  heading: 'SpaceGrotesk_500Medium',
+  body: 'DMSans_400Regular',
+  bodyMedium: 'DMSans_500Medium',
+  bodyBold: 'DMSans_700Bold',
+};
+
 export const AITypography = {
   // Display - Large metrics
   displayLarge: {
+    fontFamily: AITypefaces.display,
     fontSize: 48,
-    fontWeight: '700' as const,
     lineHeight: 56,
     letterSpacing: -1,
   },
   displayMedium: {
+    fontFamily: AITypefaces.display,
     fontSize: 36,
-    fontWeight: '700' as const,
     lineHeight: 44,
     letterSpacing: -0.5,
   },
   displaySmall: {
+    fontFamily: AITypefaces.heading,
     fontSize: 28,
-    fontWeight: '600' as const,
     lineHeight: 36,
     letterSpacing: -0.3,
   },
   
   // Headings
   h1: {
+    fontFamily: AITypefaces.display,
     fontSize: 24,
-    fontWeight: '700' as const,
     lineHeight: 32,
     letterSpacing: -0.2,
   },
   h2: {
+    fontFamily: AITypefaces.heading,
     fontSize: 20,
-    fontWeight: '600' as const,
     lineHeight: 28,
     letterSpacing: -0.1,
   },
   h3: {
+    fontFamily: AITypefaces.heading,
     fontSize: 18,
-    fontWeight: '600' as const,
     lineHeight: 26,
   },
   
   // Body
   bodyLarge: {
+    fontFamily: AITypefaces.body,
     fontSize: 16,
-    fontWeight: '400' as const,
     lineHeight: 24,
   },
   body: {
+    fontFamily: AITypefaces.body,
     fontSize: 14,
-    fontWeight: '400' as const,
     lineHeight: 22,
   },
   bodySmall: {
+    fontFamily: AITypefaces.body,
     fontSize: 13,
-    fontWeight: '400' as const,
     lineHeight: 20,
   },
   
   // Labels
   label: {
+    fontFamily: AITypefaces.bodyMedium,
     fontSize: 12,
-    fontWeight: '500' as const,
     lineHeight: 16,
     letterSpacing: 0.5,
     textTransform: 'uppercase' as const,
   },
   labelSmall: {
+    fontFamily: AITypefaces.bodyMedium,
     fontSize: 10,
-    fontWeight: '500' as const,
     lineHeight: 14,
     letterSpacing: 0.8,
     textTransform: 'uppercase' as const,
@@ -180,14 +197,14 @@ export const AITypography = {
   
   // Buttons
   button: {
+    fontFamily: AITypefaces.bodyMedium,
     fontSize: 15,
-    fontWeight: '600' as const,
     lineHeight: 20,
     letterSpacing: 0.3,
   },
   buttonSmall: {
+    fontFamily: AITypefaces.bodyMedium,
     fontSize: 13,
-    fontWeight: '600' as const,
     lineHeight: 18,
     letterSpacing: 0.2,
   },

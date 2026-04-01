@@ -8,7 +8,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuthStore } from '../store/authStore';
 import { FinancialProfile } from '../types';
 import { sendMessage, getSuggestedPrompts, ChatMessage } from '../services/OpenrouterService';
-import { AIColors, AISpacing, AIRadius } from '../theme/aiTheme';
+import { AIColors, AISpacing, AIRadius, AITypography } from '../theme/aiTheme';
+import { GridBackdrop } from '../components/ui';
 
 const FINANCIAL_PROFILE_KEY = 'financial_profile';
 
@@ -229,6 +230,7 @@ export default function AIChatScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      <GridBackdrop />
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <View style={styles.headerAvatar}>
@@ -299,45 +301,45 @@ export default function AIChatScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: AIColors.background },
-  mdH1: { fontSize: 18, fontWeight: '800', marginBottom: 6, marginTop: 4 },
-  mdH2: { fontSize: 16, fontWeight: '700', marginBottom: 4, marginTop: 4 },
-  mdH3: { fontSize: 14, fontWeight: '700', marginBottom: 3, marginTop: 4 },
-  mdParagraph: { fontSize: 14, lineHeight: 20, marginBottom: 2 },
+  mdH1: { ...AITypography.h3, marginBottom: 6, marginTop: 4 },
+  mdH2: { ...AITypography.bodyLarge, marginBottom: 4, marginTop: 4 },
+  mdH3: { ...AITypography.body, marginBottom: 3, marginTop: 4 },
+  mdParagraph: { ...AITypography.body, marginBottom: 2 },
   bulletRow: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 4 },
-  bulletDot: { fontSize: 14, marginRight: 6, marginTop: 2, fontWeight: '700' },
-  bulletNum: { fontSize: 14, marginRight: 6, fontWeight: '700', minWidth: 18 },
-  bulletText: { fontSize: 14, lineHeight: 20, flex: 1 },
+  bulletDot: { ...AITypography.body, marginRight: 6, marginTop: 2 },
+  bulletNum: { ...AITypography.body, marginRight: 6, minWidth: 18 },
+  bulletText: { ...AITypography.body, flex: 1 },
   tableRow: { flexDirection: 'row', flexWrap: 'wrap', borderBottomWidth: 1, borderBottomColor: AIColors.border, paddingVertical: 4, marginBottom: 2 },
-  tableCell: { fontSize: 12, flex: 1, paddingRight: 6, lineHeight: 18 },
+  tableCell: { ...AITypography.bodySmall, flex: 1, paddingRight: 6 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: AISpacing.lg, paddingVertical: AISpacing.md, borderBottomWidth: 1, borderBottomColor: AIColors.border, backgroundColor: AIColors.surface },
   headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   headerAvatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: AIColors.primary, justifyContent: 'center', alignItems: 'center' },
-  headerAvatarText: { fontSize: 18, fontWeight: '800', color: AIColors.background },
+  headerAvatarText: { ...AITypography.h3, color: AIColors.background },
   onlineDot: { position: 'absolute', bottom: 1, right: 1, width: 10, height: 10, borderRadius: 5, backgroundColor: '#4ADE80', borderWidth: 2, borderColor: AIColors.surface },
-  headerTitle: { fontSize: 16, fontWeight: '700', color: AIColors.text },
-  headerSub: { fontSize: 11, color: AIColors.textSecondary },
+  headerTitle: { ...AITypography.bodyLarge, color: AIColors.text },
+  headerSub: { ...AITypography.labelSmall, color: AIColors.textSecondary },
   geminiBadge: { backgroundColor: AIColors.primary + '20', borderRadius: 99, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1, borderColor: AIColors.primary + '40' },
-  geminiBadgeText: { fontSize: 11, fontWeight: '700', color: AIColors.primary, letterSpacing: 0.5 },
+  geminiBadgeText: { ...AITypography.labelSmall, color: AIColors.primary, letterSpacing: 0.5 },
   messageList: { paddingHorizontal: AISpacing.md, paddingTop: AISpacing.md, paddingBottom: AISpacing.sm },
   bubbleRow: { flexDirection: 'row', marginBottom: AISpacing.sm, alignItems: 'flex-end', gap: 8 },
   bubbleRowUser: { justifyContent: 'flex-end' },
   bubbleRowModel: { justifyContent: 'flex-start' },
   avatarFin: { width: 30, height: 30, borderRadius: 15, backgroundColor: AIColors.primary, justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
-  avatarFinText: { fontSize: 13, fontWeight: '800', color: AIColors.background },
+  avatarFinText: { ...AITypography.bodySmall, color: AIColors.background },
   bubble: { maxWidth: '78%', borderRadius: AIRadius.lg, paddingHorizontal: 14, paddingVertical: 10 },
   bubbleUser: { backgroundColor: AIColors.primary, borderBottomRightRadius: 4 },
   bubbleModel: { backgroundColor: AIColors.surface, borderWidth: 1, borderColor: AIColors.border, borderBottomLeftRadius: 4 },
-  bubbleTextUser: { fontSize: 14, lineHeight: 20, color: AIColors.background, fontWeight: '500' },
+  bubbleTextUser: { ...AITypography.body, color: AIColors.background },
   typingBubble: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingVertical: 14, paddingHorizontal: 16 },
   typingDot: { width: 7, height: 7, borderRadius: 3.5, backgroundColor: AIColors.primary },
   suggestionsContainer: { paddingHorizontal: AISpacing.md, paddingBottom: AISpacing.sm },
-  suggestionsLabel: { fontSize: 11, color: AIColors.textMuted, marginBottom: 6, letterSpacing: 0.5, textTransform: 'uppercase' },
+  suggestionsLabel: { ...AITypography.labelSmall, color: AIColors.textMuted, marginBottom: 6 },
   suggestionsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   suggestionChip: { backgroundColor: AIColors.surface, borderRadius: 99, paddingHorizontal: 12, paddingVertical: 6, borderWidth: 1, borderColor: AIColors.border },
-  suggestionChipText: { fontSize: 12, color: AIColors.textSecondary },
+  suggestionChipText: { ...AITypography.bodySmall, color: AIColors.textSecondary },
   inputBar: { flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: AISpacing.md, paddingVertical: AISpacing.sm, borderTopWidth: 1, borderTopColor: AIColors.border, backgroundColor: AIColors.surface, gap: 8 },
-  input: { flex: 1, backgroundColor: AIColors.background, borderRadius: AIRadius.xl, borderWidth: 1, borderColor: AIColors.border, color: AIColors.text, fontSize: 14, paddingHorizontal: 14, paddingVertical: 10, maxHeight: 100 },
+  input: { flex: 1, backgroundColor: AIColors.background, borderRadius: AIRadius.xl, borderWidth: 1, borderColor: AIColors.border, color: AIColors.text, ...AITypography.body, paddingHorizontal: 14, paddingVertical: 10, maxHeight: 100 },
   sendBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: AIColors.primary, justifyContent: 'center', alignItems: 'center' },
   sendBtnDisabled: { opacity: 0.4 },
-  sendBtnIcon: { fontSize: 18, fontWeight: '800', color: AIColors.background },
+  sendBtnIcon: { ...AITypography.h3, color: AIColors.background },
 });

@@ -27,12 +27,12 @@ import { Platform } from 'react-native';
 
 // Firebase configuration from your existing project
 const firebaseConfig = {
-  apiKey: 'AIzaSyAdYIj3sWpKF7Xct2UqTGps5r0qATgQw3k',
-  authDomain: 'finstability2.firebaseapp.com',
-  projectId: 'finstability2',
-  storageBucket: 'finstability2.firebasestorage.app',
-  messagingSenderId: '168056273415',
-  appId: '1:168056273415:web:6e50d8713fb8b5fbbd08a2',
+  apiKey: 'AIzaSyAGTZmGgwhwymtvct0ZIXVdg3PvZzbiWkQ',
+  authDomain: 'finstability-3e71d.firebaseapp.com',
+  projectId: 'finstability-3e71d',
+  storageBucket: 'finstability-3e71d.firebasestorage.app',
+  messagingSenderId: '793985902050',
+  appId: '1:793985902050:android:e09e9af9944d54b70185bb',
 };
 
 // Initialize Firebase

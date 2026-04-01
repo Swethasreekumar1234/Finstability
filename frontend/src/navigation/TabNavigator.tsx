@@ -1,6 +1,6 @@
 /**
  * Bottom Tab Navigator
- * Five-tab layout: Home · Health · Goals · Benefits · Profile
+ * Five-tab layout with intent labels: Home · Plan · Goals · Discover · Profile
  */
 
 import React from 'react';
@@ -12,7 +12,7 @@ import { AIColors, AIRadius, AITypography } from '../theme/aiTheme';
 
 // Screens
 import DashboardScreen from '../screens/DashboardScreen';
-import FinancialHealthScoreScreen from '../screens/FinancialHealthScoreScreen';
+import PlanScreen from '../screens/PlanScreen';
 import GoalsScreen from '../screens/GoalsScreen';
 import BenefitsScreen from '../screens/BenefitsScreen';
 import FinancialProfileScreen from '../screens/FinancialProfileScreen';
@@ -50,11 +50,11 @@ export default function TabNavigator() {
         },
       })}
     >
-      <Tab.Screen name="Home"    component={DashboardScreen}               options={{ tabBarLabel: 'Home' }} />
-      <Tab.Screen name="Health"  component={FinancialHealthScoreScreen}    options={{ tabBarLabel: 'Health' }} />
-      <Tab.Screen name="Goals"    component={GoalsScreen}                   options={{ tabBarLabel: 'Goals' }} />
-      <Tab.Screen name="Benefits" component={BenefitsScreen}               options={{ tabBarLabel: 'Benefits' }} />
-      <Tab.Screen name="Profile" component={FinancialProfileScreen}        options={{ tabBarLabel: 'Profile' }} />
+      <Tab.Screen name="Home" component={DashboardScreen} options={{ tabBarLabel: 'Home' }} />
+      <Tab.Screen name="Health" component={PlanScreen} options={{ tabBarLabel: 'Plan' }} />
+      <Tab.Screen name="Goals" component={GoalsScreen} options={{ tabBarLabel: 'Goals' }} />
+      <Tab.Screen name="Benefits" component={BenefitsScreen} options={{ tabBarLabel: 'Discover' }} />
+      <Tab.Screen name="Profile" component={FinancialProfileScreen} options={{ tabBarLabel: 'Profile' }} />
     </Tab.Navigator>
   );
 }

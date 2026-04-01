@@ -11,7 +11,6 @@ import {
   StyleSheet,
   ActivityIndicator,
   Animated,
-  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -21,11 +20,9 @@ import { RootStackParamList } from '../types';
 import { useAuthStore } from '../store/authStore';
 import { AIColors, AISpacing, AIRadius, AIShadows, AITypography } from '../theme/aiTheme';
 import { GOOGLE_CONFIG } from '../config/google';
-import { GlassCard, AIButton } from '../components/ai';
+import { GridBackdrop } from '../components/ui';
 
 WebBrowser.maybeCompleteAuthSession();
-
-const { width, height } = Dimensions.get('window');
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Login'>;
@@ -124,19 +121,10 @@ export default function LoginScreen({ navigation }: Props) {
 
   return (
     <View style={styles.container}>
-      {/* Background Grid Pattern */}
-      <View style={styles.gridPattern}>
-        {[...Array(20)].map((_, i) => (
-          <View key={`h-${i}`} style={[styles.gridLine, styles.gridHorizontal, { top: i * 50 }]} />
-        ))}
-        {[...Array(10)].map((_, i) => (
-          <View key={`v-${i}`} style={[styles.gridLine, styles.gridVertical, { left: i * 50 }]} />
-        ))}
-      </View>
+      <GridBackdrop />
 
       {/* Glow Orbs */}
       <Animated.View style={[styles.glowOrb, styles.glowOrbPrimary, { opacity: glowAnim }]} />
-      <Animated.View style={[styles.glowOrb, styles.glowOrbSecondary, { opacity: glowAnim }]} />
 
       <SafeAreaView style={styles.safeArea}>
         <Animated.View
@@ -252,28 +240,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   
-  // Grid Pattern Background
-  gridPattern: {
-    ...StyleSheet.absoluteFillObject,
-    overflow: 'hidden',
-  },
-  gridLine: {
-    position: 'absolute',
-    backgroundColor: AIColors.border,
-  },
-  gridHorizontal: {
-    left: 0,
-    right: 0,
-    height: 1,
-    opacity: 0.3,
-  },
-  gridVertical: {
-    top: 0,
-    bottom: 0,
-    width: 1,
-    opacity: 0.3,
-  },
-
   // Glow Effects
   glowOrb: {
     position: 'absolute',
@@ -282,18 +248,10 @@ const styles = StyleSheet.create({
   glowOrbPrimary: {
     top: -150,
     right: -100,
-    width: 400,
-    height: 400,
+    width: 280,
+    height: 280,
     backgroundColor: AIColors.primary,
-    opacity: 0.15,
-  },
-  glowOrbSecondary: {
-    bottom: -100,
-    left: -150,
-    width: 350,
-    height: 350,
-    backgroundColor: AIColors.secondary,
-    opacity: 0.1,
+    opacity: 0.12,
   },
 
   content: {
@@ -323,8 +281,7 @@ const styles = StyleSheet.create({
     ...AIShadows.glow,
   },
   logoSymbol: {
-    fontSize: 48,
-    fontWeight: '700',
+    ...AITypography.displayMedium,
     color: AIColors.background,
   },
   logoRing: {
@@ -338,8 +295,7 @@ const styles = StyleSheet.create({
     borderColor: AIColors.primaryGlow,
   },
   appName: {
-    fontSize: 28,
-    fontWeight: '700',
+    ...AITypography.displaySmall,
     color: AIColors.text,
     letterSpacing: 3,
     marginBottom: AISpacing.xs,
@@ -389,7 +345,7 @@ const styles = StyleSheet.create({
     borderRadius: AIRadius.lg,
     marginBottom: AISpacing.lg,
     borderWidth: 1,
-    borderColor: 'rgba(239, 68, 68, 0.3)',
+    borderColor: AIColors.error + '4D',
   },
   errorIcon: {
     fontSize: 16,

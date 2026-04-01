@@ -12,8 +12,9 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { RootStackParamList, FinancialProfile } from '../types';
 import { useAuthStore } from '../store/authStore';
-import { AIColors, AISpacing, AIRadius, AIShadows } from '../theme/aiTheme';
+import { AIColors, AISpacing, AIRadius, AIShadows, AITypography, AISchemeCategoryColors } from '../theme/aiTheme';
 import { ProgressBar } from '../components/ai';
+import { GridBackdrop, PriorityActionsQueue } from '../components/ui';
 import { getFinancialRecommendations } from '../services/recommendationEngine';
 import { apiService, SchemeRecommendation } from '../services/apiService';
 
@@ -42,11 +43,7 @@ function scoreColor(s: number) {
   return s >= 75 ? AIColors.primary : s >= 50 ? AIColors.warning : AIColors.error;
 }
 function catColor(cat: string): string {
-  const m: Record<string,string> = {
-    subsidy: '#F59E0B', pension: '#8B5CF6', insurance: '#3B82F6',
-    grant: '#10B981', loan_support: '#EF4444', scholarship: '#EC4899',
-  };
-  return m[cat] ?? AIColors.primary;
+  return AISchemeCategoryColors[cat] ?? AIColors.primary;
 }
 
 export default function DashboardScreen() {
@@ -100,6 +97,7 @@ export default function DashboardScreen() {
 
   return (
     <SafeAreaView style={st.safe}>
+      <GridBackdrop />
       <ScrollView style={st.scroll} contentContainerStyle={st.content} showsVerticalScrollIndicator={false}>
         <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
           {/* Header */}
@@ -188,15 +186,15 @@ export default function DashboardScreen() {
           )}
           {/* Tips */}
           {tips.length > 0 && (
-            <>
-              <Text style={st.section}>Financial Tips</Text>
-              {tips.map((tip, i) => (
-                <View key={i} style={st.tipCard}>
-                  <Text style={st.tipNum}>#{i + 1}</Text>
-                  <Text style={st.tipTxt}>{tip}</Text>
-                </View>
-              ))}
-            </>
+            <PriorityActionsQueue
+              title="Next Best Actions"
+              items={tips.map((tip, i) => ({
+                id: `tip-${i}`,
+                title: tip,
+                ctaLabel: 'Open Tips',
+                onPress: () => nav.navigate('Tips'),
+              }))}
+            />
           )}
           {/* Quick actions */}
           <Text style={st.section}>Quick Actions</Text>
@@ -205,6 +203,7 @@ export default function DashboardScreen() {
               { icon: 'Edit', lbl: 'Update Profile',  fn: () => nav.navigate('FinancialInput') },
               { icon: 'Tips', lbl: 'All Tips',         fn: () => nav.navigate('Tips') },
               { icon: 'Invest', lbl: 'Investments',   fn: () => nav.navigate('InvestmentRecommendations') },
+              { icon: 'AI', lbl: 'AI Coach',          fn: () => nav.navigate('AIChat') },
             ].map((a) => (
               <TouchableOpacity key={a.lbl} style={st.actionBtn} onPress={a.fn}>
                 <Text style={st.actionIcon}>{a.icon}</Text>
@@ -225,42 +224,39 @@ const st = StyleSheet.create({
   content: { padding: AISpacing.md },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: AIColors.background },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: AISpacing.md },
-  greeting: { fontSize: 13, color: AIColors.textSecondary },
-  name: { fontSize: 22, fontWeight: '700', color: AIColors.text, marginTop: 2 },
+  greeting: { ...AITypography.label, color: AIColors.textSecondary },
+  name: { ...AITypography.h1, color: AIColors.text, marginTop: 2 },
   avatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: AIColors.primaryDim, justifyContent: 'center', alignItems: 'center', borderWidth: 1.5, borderColor: AIColors.primary },
-  avatarTxt: { fontSize: 18, fontWeight: '700', color: AIColors.primary },
+  avatarTxt: { ...AITypography.h3, color: AIColors.primary },
   notice: { backgroundColor: AIColors.secondaryDim, borderRadius: AIRadius.md, padding: AISpacing.sm, marginBottom: AISpacing.md, borderLeftWidth: 3, borderLeftColor: AIColors.secondary },
-  noticeTxt: { fontSize: 11, color: AIColors.textSecondary, lineHeight: 16 },
+  noticeTxt: { ...AITypography.bodySmall, color: AIColors.textSecondary },
   card: { backgroundColor: AIColors.surface, borderRadius: AIRadius.xl, padding: AISpacing.lg, marginBottom: AISpacing.md, borderWidth: 1, borderColor: AIColors.border, ...AIShadows.md },
   scoreRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  scoreLbl: { fontSize: 12, color: AIColors.textSecondary, marginBottom: 4 },
-  scoreNum: { fontSize: 52, fontWeight: '800' },
-  scoreOf: { fontSize: 16, color: AIColors.textMuted, fontWeight: '400' },
+  scoreLbl: { ...AITypography.label, color: AIColors.textSecondary, marginBottom: 4 },
+  scoreNum: { ...AITypography.displayLarge },
+  scoreOf: { ...AITypography.bodyLarge, color: AIColors.textMuted },
   ring: { width: 72, height: 72, borderRadius: 36, borderWidth: 5, justifyContent: 'center', alignItems: 'center' },
-  ringNum: { fontSize: 20, fontWeight: '700' },
-  scoreTip: { fontSize: 13, color: AIColors.textSecondary },
+  ringNum: { ...AITypography.h2 },
+  scoreTip: { ...AITypography.bodySmall, color: AIColors.textSecondary },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: AISpacing.sm, marginBottom: AISpacing.md },
   statCard: { flex: 1, minWidth: '44%', backgroundColor: AIColors.surface, borderRadius: AIRadius.lg, padding: AISpacing.md, borderWidth: 1, borderColor: AIColors.border },
-  statVal: { fontSize: 18, fontWeight: '700', marginBottom: 4 },
-  statLbl: { fontSize: 11, color: AIColors.textSecondary },
+  statVal: { ...AITypography.h3, marginBottom: 4 },
+  statLbl: { ...AITypography.labelSmall, color: AIColors.textSecondary },
   benefitBanner: { backgroundColor: AIColors.primary + '1A', borderRadius: AIRadius.lg, padding: AISpacing.md, marginBottom: AISpacing.md, borderWidth: 1, borderColor: AIColors.primary + '40', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  benefitLbl: { fontSize: 13, color: AIColors.textSecondary, flex: 1 },
-  benefitVal: { fontSize: 20, fontWeight: '800', color: AIColors.primary },
-  section: { fontSize: 16, fontWeight: '700', color: AIColors.text, marginBottom: AISpacing.sm, marginTop: AISpacing.sm },
+  benefitLbl: { ...AITypography.bodySmall, color: AIColors.textSecondary, flex: 1 },
+  benefitVal: { ...AITypography.h2, color: AIColors.primary },
+  section: { ...AITypography.h3, color: AIColors.text, marginBottom: AISpacing.sm, marginTop: AISpacing.sm },
   schemeCard: { backgroundColor: AIColors.surface, borderRadius: AIRadius.lg, padding: AISpacing.md, marginBottom: AISpacing.sm, borderWidth: 1, borderColor: AIColors.border },
   schemeTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: AISpacing.sm },
   tag: { paddingHorizontal: AISpacing.sm, paddingVertical: 3, borderRadius: AIRadius.sm },
-  tagTxt: { fontSize: 10, fontWeight: '700' },
-  schemeBen: { fontSize: 13, fontWeight: '700', color: AIColors.primary },
-  schemeName: { fontSize: 15, fontWeight: '700', color: AIColors.text, marginBottom: 4 },
-  schemeDesc: { fontSize: 12, color: AIColors.textSecondary, lineHeight: 18, marginBottom: AISpacing.sm },
+  tagTxt: { ...AITypography.labelSmall },
+  schemeBen: { ...AITypography.bodySmall, color: AIColors.primary },
+  schemeName: { ...AITypography.bodyLarge, color: AIColors.text, marginBottom: 4 },
+  schemeDesc: { ...AITypography.bodySmall, color: AIColors.textSecondary, marginBottom: AISpacing.sm },
   applyBtn: { alignSelf: 'flex-start', backgroundColor: AIColors.primaryDim, paddingHorizontal: AISpacing.md, paddingVertical: 6, borderRadius: AIRadius.full, borderWidth: 1, borderColor: AIColors.primary },
-  applyTxt: { fontSize: 12, fontWeight: '700', color: AIColors.primary },
-  tipCard: { flexDirection: 'row', backgroundColor: AIColors.surface, borderRadius: AIRadius.md, padding: AISpacing.md, marginBottom: AISpacing.sm, borderWidth: 1, borderColor: AIColors.border, gap: AISpacing.sm },
-  tipNum: { fontSize: 18, fontWeight: '800', color: AIColors.primary },
-  tipTxt: { flex: 1, fontSize: 13, color: AIColors.textSecondary, lineHeight: 20 },
-  actions: { flexDirection: 'row', gap: AISpacing.sm, marginTop: AISpacing.sm },
-  actionBtn: { flex: 1, backgroundColor: AIColors.surface, borderRadius: AIRadius.lg, padding: AISpacing.md, alignItems: 'center', borderWidth: 1, borderColor: AIColors.border },
-  actionIcon: { fontSize: 13, marginBottom: 6, color: AIColors.primary, fontWeight: '700' },
-  actionLbl: { fontSize: 11, color: AIColors.textSecondary, textAlign: 'center' },
+  applyTxt: { ...AITypography.buttonSmall, color: AIColors.primary },
+  actions: { flexDirection: 'row', flexWrap: 'wrap', gap: AISpacing.sm, marginTop: AISpacing.sm },
+  actionBtn: { width: '48%', backgroundColor: AIColors.surface, borderRadius: AIRadius.lg, padding: AISpacing.md, alignItems: 'center', borderWidth: 1, borderColor: AIColors.border },
+  actionIcon: { ...AITypography.bodySmall, marginBottom: 6, color: AIColors.primary },
+  actionLbl: { ...AITypography.labelSmall, color: AIColors.textSecondary, textAlign: 'center' },
 });

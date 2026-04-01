@@ -11,20 +11,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { FinancialProfile } from '../types';
-import { AIColors, AISpacing, AIRadius, AIShadows } from '../theme/aiTheme';
+import { AIColors, AISpacing, AIRadius, AIShadows, AITypography, AISchemeCategoryColors } from '../theme/aiTheme';
+import { GridBackdrop } from '../components/ui';
 import { apiService, SchemeRecommendation } from '../services/apiService';
 import { getFinancialRecommendations } from '../services/recommendationEngine';
 
 const PROFILE_KEY = 'financial_profile';
-
-const CATEGORY_COLORS: Record<string, string> = {
-  subsidy:      '#F59E0B',
-  pension:      '#8B5CF6',
-  insurance:    '#3B82F6',
-  grant:        '#10B981',
-  loan_support: '#EF4444',
-  scholarship:  '#EC4899',
-};
 
 const CATEGORIES = ['All', 'subsidy', 'pension', 'insurance', 'grant', 'loan_support', 'scholarship'];
 
@@ -36,7 +28,7 @@ function fmt(n: number): string {
 }
 
 function catColor(cat: string): string {
-  return CATEGORY_COLORS[cat] ?? AIColors.primary;
+  return AISchemeCategoryColors[cat] ?? AIColors.primary;
 }
 
 export default function BenefitsScreen() {
@@ -128,6 +120,7 @@ export default function BenefitsScreen() {
 
   return (
     <SafeAreaView style={st.safe}>
+      <GridBackdrop />
       <ScrollView contentContainerStyle={st.content} showsVerticalScrollIndicator={false}>
 
         {/* Missing Benefits Hero */}
@@ -252,37 +245,37 @@ const st = StyleSheet.create({
   content: { padding: AISpacing.md },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: AIColors.background },
   hero: { backgroundColor: AIColors.surface, borderRadius: AIRadius.xl, padding: AISpacing.lg, marginBottom: AISpacing.md, borderWidth: 1, borderColor: AIColors.primary + '40', alignItems: 'center', ...AIShadows.glow },
-  heroTag: { fontSize: 13, color: AIColors.textSecondary, marginBottom: AISpacing.sm },
-  heroAmount: { fontSize: 44, fontWeight: '900', color: AIColors.primary, lineHeight: 52 },
-  heroYear: { fontSize: 18, fontWeight: '400', color: AIColors.textSecondary },
-  heroSub: { fontSize: 12, color: AIColors.textSecondary, marginTop: 6 },
+  heroTag: { ...AITypography.label, color: AIColors.textSecondary, marginBottom: AISpacing.sm },
+  heroAmount: { ...AITypography.displayMedium, color: AIColors.primary },
+  heroYear: { ...AITypography.bodyLarge, color: AIColors.textSecondary },
+  heroSub: { ...AITypography.bodySmall, color: AIColors.textSecondary, marginTop: 6 },
   offlinePill: { marginTop: AISpacing.sm, backgroundColor: AIColors.warningDim, paddingHorizontal: AISpacing.md, paddingVertical: 4, borderRadius: AIRadius.full },
-  offlineTxt: { fontSize: 11, color: AIColors.warning },
+  offlineTxt: { ...AITypography.labelSmall, color: AIColors.warning },
   notice: { backgroundColor: AIColors.secondaryDim, borderRadius: AIRadius.md, padding: AISpacing.sm, marginBottom: AISpacing.md, borderLeftWidth: 3, borderLeftColor: AIColors.secondary },
-  noticeTxt: { fontSize: 11, color: AIColors.textSecondary, lineHeight: 16 },
+  noticeTxt: { ...AITypography.bodySmall, color: AIColors.textSecondary },
   filterRow: { marginBottom: AISpacing.sm },
   filterChip: { paddingHorizontal: AISpacing.md, paddingVertical: 7, borderRadius: AIRadius.full, borderWidth: 1, borderColor: AIColors.border, marginRight: AISpacing.sm, backgroundColor: AIColors.surfaceLight },
-  filterChipTxt: { fontSize: 12, color: AIColors.textSecondary, fontWeight: '600' },
-  countTxt: { fontSize: 12, color: AIColors.textMuted, marginBottom: AISpacing.md },
+  filterChipTxt: { ...AITypography.label, color: AIColors.textSecondary },
+  countTxt: { ...AITypography.bodySmall, color: AIColors.textMuted, marginBottom: AISpacing.md },
   schemeCard: { backgroundColor: AIColors.surface, borderRadius: AIRadius.xl, padding: AISpacing.lg, marginBottom: AISpacing.md, borderWidth: 1, borderColor: AIColors.border, borderLeftWidth: 4, ...AIShadows.sm },
   schemeTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: AISpacing.sm },
   catTag: { paddingHorizontal: AISpacing.sm, paddingVertical: 3, borderRadius: AIRadius.sm },
-  catTagTxt: { fontSize: 10, fontWeight: '700' },
-  benefitAmt: { fontSize: 14, fontWeight: '800', color: AIColors.primary },
-  schemeName: { fontSize: 16, fontWeight: '800', color: AIColors.text, marginBottom: 2 },
-  schemeMini: { fontSize: 11, color: AIColors.textMuted, marginBottom: AISpacing.sm },
-  schemeDesc: { fontSize: 13, color: AIColors.textSecondary, lineHeight: 19, marginBottom: AISpacing.sm },
+  catTagTxt: { ...AITypography.labelSmall },
+  benefitAmt: { ...AITypography.bodySmall, color: AIColors.primary },
+  schemeName: { ...AITypography.h3, color: AIColors.text, marginBottom: 2 },
+  schemeMini: { ...AITypography.labelSmall, color: AIColors.textMuted, marginBottom: AISpacing.sm },
+  schemeDesc: { ...AITypography.bodySmall, color: AIColors.textSecondary, marginBottom: AISpacing.sm },
   reasonRow: { flexDirection: 'row', gap: 6, backgroundColor: AIColors.successDim, borderRadius: AIRadius.sm, padding: AISpacing.sm, marginBottom: AISpacing.md },
-  reasonIcon: { fontSize: 13, color: AIColors.success },
-  reasonTxt: { flex: 1, fontSize: 12, color: AIColors.success, lineHeight: 18 },
+  reasonIcon: { ...AITypography.bodySmall, color: AIColors.success },
+  reasonTxt: { ...AITypography.bodySmall, flex: 1, color: AIColors.success },
   detail: { backgroundColor: AIColors.backgroundSecondary, borderRadius: AIRadius.md, padding: AISpacing.md, marginBottom: AISpacing.md },
-  detailHdr: { fontSize: 12, fontWeight: '700', color: AIColors.textSecondary, marginBottom: 4, marginTop: AISpacing.sm },
-  detailTxt: { fontSize: 12, color: AIColors.text, lineHeight: 18 },
+  detailHdr: { ...AITypography.label, color: AIColors.textSecondary, marginBottom: 4, marginTop: AISpacing.sm },
+  detailTxt: { ...AITypography.bodySmall, color: AIColors.text },
   btns: { flexDirection: 'row', gap: AISpacing.sm },
   applyBtn: { flex: 1, backgroundColor: AIColors.primary, padding: AISpacing.md, borderRadius: AIRadius.lg, alignItems: 'center' },
-  applyTxt: { fontSize: 13, fontWeight: '700', color: AIColors.background },
+  applyTxt: { ...AITypography.buttonSmall, color: AIColors.background },
   detailBtn: { flex: 1, padding: AISpacing.md, borderRadius: AIRadius.lg, alignItems: 'center', borderWidth: 1, borderColor: AIColors.border },
-  detailBtnTxt: { fontSize: 13, fontWeight: '600', color: AIColors.textSecondary },
+  detailBtnTxt: { ...AITypography.buttonSmall, color: AIColors.textSecondary },
   emptyCard: { backgroundColor: AIColors.surface, borderRadius: AIRadius.xl, padding: AISpacing.xl, alignItems: 'center', borderWidth: 1, borderColor: AIColors.border },
-  emptyTxt: { fontSize: 14, color: AIColors.textSecondary, textAlign: 'center' },
+  emptyTxt: { ...AITypography.body, color: AIColors.textSecondary, textAlign: 'center' },
 });

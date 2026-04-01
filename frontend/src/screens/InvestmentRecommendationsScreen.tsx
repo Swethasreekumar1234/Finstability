@@ -13,11 +13,13 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { AIColors, AIRadius, AISpacing, AIShadows } from '../theme/aiTheme';
-import { FinancialProfile } from '../types';
+import { AIColors, AIRadius, AISpacing, AIShadows, AITypography } from '../theme/aiTheme';
+import { FinancialProfile, RootStackParamList } from '../types';
 import { apiService, InvestmentPortfolio } from '../services/apiService';
+import { GridBackdrop, ScreenHeader } from '../components/ui';
 
 const FINANCIAL_PROFILE_KEY = 'financial_profile';
 
@@ -95,6 +97,7 @@ function riskColor(level: string): string {
 }
 
 export default function InvestmentRecommendationsScreen() {
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [loading, setLoading] = useState(true);
   const [portfolios, setPortfolios] = useState<InvestmentPortfolio[]>([]);
   const [monthlyAmount, setMonthlyAmount] = useState(0);
@@ -151,9 +154,14 @@ export default function InvestmentRecommendationsScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
+      <GridBackdrop />
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <Text style={styles.title}>Investment Recommendations</Text>
-        <Text style={styles.subtitle}>Three portfolios tailored to your current profile.</Text>
+        <ScreenHeader
+          title="Investment Recommendations"
+          subtitle="Three portfolios tailored to your current profile."
+          onBack={() => navigation.goBack()}
+          backLabel="Back"
+        />
 
         <View style={styles.heroCard}>
           <Text style={styles.heroLabel}>Suggested Monthly Investment</Text>
@@ -218,8 +226,6 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: AIColors.background },
   content: { padding: AISpacing.md },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: AIColors.background },
-  title: { fontSize: 27, fontWeight: '900', color: AIColors.text, marginBottom: 4 },
-  subtitle: { fontSize: 13, color: AIColors.textSecondary, marginBottom: AISpacing.md },
   heroCard: {
     backgroundColor: AIColors.surface,
     borderRadius: AIRadius.xl,
@@ -229,9 +235,9 @@ const styles = StyleSheet.create({
     marginBottom: AISpacing.md,
     ...AIShadows.glow,
   },
-  heroLabel: { fontSize: 12, color: AIColors.textSecondary, marginBottom: 4 },
-  heroAmount: { fontSize: 38, lineHeight: 42, fontWeight: '900', color: AIColors.primary },
-  heroReason: { fontSize: 12, color: AIColors.textSecondary, marginTop: 6, lineHeight: 18 },
+  heroLabel: { ...AITypography.label, color: AIColors.textSecondary, marginBottom: 4 },
+  heroAmount: { ...AITypography.displayMedium, color: AIColors.primary },
+  heroReason: { ...AITypography.bodySmall, color: AIColors.textSecondary, marginTop: 6 },
   card: {
     backgroundColor: AIColors.surface,
     borderRadius: AIRadius.xl,
@@ -244,11 +250,11 @@ const styles = StyleSheet.create({
   cardPrimary: { borderColor: AIColors.primary + '66' },
   cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
   riskBadge: { borderRadius: AIRadius.sm, paddingHorizontal: 8, paddingVertical: 4 },
-  riskText: { fontSize: 10, fontWeight: '700', letterSpacing: 0.4 },
-  returnText: { fontSize: 13, color: AIColors.success, fontWeight: '700' },
-  cardTitle: { fontSize: 17, color: AIColors.text, fontWeight: '800', marginBottom: 4 },
-  cardDesc: { fontSize: 13, color: AIColors.textSecondary, lineHeight: 18, marginBottom: 8 },
-  primaryNote: { fontSize: 11, color: AIColors.primary, marginBottom: 8, fontWeight: '600' },
+  riskText: { ...AITypography.labelSmall, letterSpacing: 0.4 },
+  returnText: { ...AITypography.bodySmall, color: AIColors.success },
+  cardTitle: { ...AITypography.h3, color: AIColors.text, marginBottom: 4 },
+  cardDesc: { ...AITypography.bodySmall, color: AIColors.textSecondary, marginBottom: 8 },
+  primaryNote: { ...AITypography.labelSmall, color: AIColors.primary, marginBottom: 8 },
   allocWrap: {
     backgroundColor: AIColors.backgroundSecondary,
     borderRadius: AIRadius.md,
@@ -258,17 +264,17 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   allocRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
-  allocName: { fontSize: 12, color: AIColors.textSecondary },
-  allocPct: { fontSize: 12, color: AIColors.text, fontWeight: '700' },
+  allocName: { ...AITypography.bodySmall, color: AIColors.textSecondary },
+  allocPct: { ...AITypography.bodySmall, color: AIColors.text },
   metaRow: { marginBottom: AISpacing.sm },
-  metaText: { fontSize: 12, color: AIColors.textMuted },
+  metaText: { ...AITypography.bodySmall, color: AIColors.textMuted },
   cta: {
     backgroundColor: AIColors.primary,
     borderRadius: AIRadius.lg,
     paddingVertical: 12,
     alignItems: 'center',
   },
-  ctaText: { fontSize: 13, fontWeight: '800', color: AIColors.background },
+  ctaText: { ...AITypography.buttonSmall, color: AIColors.background },
   notice: {
     backgroundColor: AIColors.warningDim,
     borderRadius: AIRadius.lg,
@@ -276,5 +282,5 @@ const styles = StyleSheet.create({
     borderLeftColor: AIColors.warning,
     padding: AISpacing.sm,
   },
-  noticeText: { fontSize: 11, color: AIColors.textSecondary, lineHeight: 16 },
+  noticeText: { ...AITypography.bodySmall, color: AIColors.textSecondary },
 });
