@@ -32,9 +32,24 @@ function money(v: number): string {
 
 export default function FinancialProfileScreen() {
   const nav = useNavigation<StackNav>();
-  const { currentUser: user } = useAuthStore();
+  const { currentUser: user, logout } = useAuthStore();
   const [loading, setLoading] = useState(true);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [profile, setProfile] = useState<FinancialProfile | null>(null);
+
+  const handleLogout = async () => {
+    if (isLoggingOut) return;
+    setIsLoggingOut(true);
+    try {
+      await logout();
+      nav.reset({
+        index: 0,
+        routes: [{ name: 'Login' }],
+      });
+    } finally {
+      setIsLoggingOut(false);
+    }
+  };
 
   useFocusEffect(
     useCallback(() => {
@@ -125,6 +140,10 @@ export default function FinancialProfileScreen() {
           <Text style={styles.ctaText}>Update Financial Profile</Text>
         </TouchableOpacity>
 
+        <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout} disabled={isLoggingOut}>
+          <Text style={styles.logoutText}>{isLoggingOut ? 'Logging out...' : 'Logout'}</Text>
+        </TouchableOpacity>
+
         <View style={{ height: 96 }} />
       </ScrollView>
     </SafeAreaView>
@@ -210,4 +229,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   ctaText: { ...AITypography.button, color: AIColors.background },
+  logoutBtn: {
+    marginTop: AISpacing.sm,
+    backgroundColor: AIColors.surface,
+    borderWidth: 1,
+    borderColor: AIColors.error,
+    borderRadius: AIRadius.xl,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  logoutText: {
+    ...AITypography.button,
+    color: AIColors.error,
+  },
 });

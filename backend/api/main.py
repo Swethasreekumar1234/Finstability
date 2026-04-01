@@ -55,11 +55,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-from api.routes import profile, schemes, investments  # noqa: E402
+from api.routes import profile, schemes, investments, transactions  # noqa: E402
 
 app.include_router(profile.router, prefix="/profile", tags=["Profile"])
 app.include_router(schemes.router, prefix="/schemes", tags=["Schemes"])
 app.include_router(investments.router, prefix="/investments", tags=["Investments"])
+app.include_router(transactions.router, prefix="/transactions", tags=["Transactions"])
 
 
 @app.get("/health", tags=["Health"])

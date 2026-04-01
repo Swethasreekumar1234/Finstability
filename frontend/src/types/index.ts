@@ -149,21 +149,28 @@ export interface FinancialTip {
 // Navigation param types
 export type RootStackParamList = {
   Login: undefined;
+  EmailSignin: undefined;
+  EmailSignup: undefined;
   PhoneLogin: undefined;
   OtpVerification: { phoneNumber: string; verificationId: string };
   ProfileSetup: undefined;
   Dashboard: undefined;
-  FinancialInput: undefined;
+  FinancialInput: { fromOnboarding?: boolean } | undefined;
   FinancialHealth: undefined;
   Tips: undefined;
   InvestmentRecommendations: undefined;
   AIChat: undefined;
+  Transactions: undefined;
+  AddTransaction: undefined;
+  UploadStatement: undefined;
+  SpendingInsights: undefined;
 };
 
 // Bottom tab navigation param types  (Home · Health · Goals · Benefits · Profile)
 export type TabParamList = {
   Home: undefined;
   Health: undefined;
+  Transactions: undefined;
   Goals: undefined;
   Benefits: undefined;
   Profile: undefined;

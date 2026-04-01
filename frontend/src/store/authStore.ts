@@ -59,6 +59,8 @@ interface AuthState {
 
   // Google Auth Actions
   signInWithGoogle: (idToken: string) => Promise<{ success: boolean; isNewUser: boolean }>;
+  signInWithEmail: (email: string) => Promise<{ success: boolean; message?: string }>;
+  signUpWithEmail: (fullName: string, email: string) => Promise<{ success: boolean; message?: string }>;
   clearError: () => void;
 
   // Profile Actions
@@ -75,6 +77,76 @@ interface AuthState {
   initialize: () => Promise<void>;
   resetAuthState: () => void;
 }
+
+const normalizeIndianPhone = (phone: string): string => phone.replace(/\D/g, '').slice(-10);
+
+const hasCompleteLocalProfile = async (): Promise<boolean> => {
+  const values = await AsyncStorage.multiGet([
+    'user_fullName',
+    'user_userType',
+    'user_monthlyIncome',
+    'user_riskTolerance',
+  ]);
+
+  const map = Object.fromEntries(values);
+  return Boolean(
+    map.user_fullName?.trim() &&
+      map.user_userType &&
+      map.user_monthlyIncome &&
+      parseFloat(map.user_monthlyIncome) > 0 &&
+      map.user_riskTolerance
+  );
+};
+
+const hasLocalProfileForIdentity = async (identity: {
+  phoneNumber?: string;
+  email?: string | null;
+}): Promise<boolean> => {
+  const complete = await hasCompleteLocalProfile();
+  if (!complete) return false;
+
+  const [storedPhone, storedEmail] = await AsyncStorage.multiGet(['user_phoneNumber', 'user_email']);
+  const savedPhone = storedPhone[1] || '';
+  const savedEmail = (storedEmail[1] || '').trim().toLowerCase();
+
+  if (identity.phoneNumber) {
+    return normalizeIndianPhone(savedPhone) === normalizeIndianPhone(identity.phoneNumber);
+  }
+
+  if (identity.email) {
+    return savedEmail === identity.email.trim().toLowerCase();
+  }
+
+  return true;
+};
+
+const loadUserProfileFromLocal = async (): Promise<User | null> => {
+  const values = await AsyncStorage.multiGet([
+    'user_phoneNumber',
+    'user_fullName',
+    'user_email',
+    'user_userType',
+    'user_monthlyIncome',
+    'user_riskTolerance',
+  ]);
+
+  const map = Object.fromEntries(values);
+  const monthlyIncome = parseFloat(map.user_monthlyIncome || '0');
+
+  if (!map.user_fullName || !map.user_userType || !map.user_riskTolerance || monthlyIncome <= 0) {
+    return null;
+  }
+
+  return {
+    phoneNumber: map.user_phoneNumber || '',
+    fullName: map.user_fullName,
+    email: map.user_email || '',
+    userType: map.user_userType as UserType,
+    monthlyIncome,
+    riskTolerance: map.user_riskTolerance as RiskTolerance,
+    createdAt: Date.now(),
+  };
+};
 
 export const useAuthStore = create<AuthState>((set, get) => ({
   // Initial State
@@ -166,12 +238,19 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       await AsyncStorage.setItem('firebaseUid', uid);
       await AsyncStorage.setItem('phoneNumber', phoneNumber);
 
-      // Check if user profile exists in Firestore
-      const exists = await checkUserExists(uid);
+      // Check if user profile exists in Firestore or local storage
+      const existsRemote = await checkUserExists(uid);
+      const existsLocal = await hasLocalProfileForIdentity({ phoneNumber });
 
-      if (exists) {
-        // Load existing profile
-        await get().loadUserProfile();
+      if (existsRemote || existsLocal) {
+        if (existsRemote) {
+          await get().loadUserProfile();
+        } else {
+          const localUser = await loadUserProfileFromLocal();
+          if (localUser) {
+            set({ currentUser: localUser });
+          }
+        }
         set({ isLoggedIn: true });
         return { success: true, isNewUser: false };
       } else {
@@ -223,11 +302,50 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         set({ fullName: user.displayName });
       }
 
-      // Check if user profile exists in Firestore
-      const exists = await checkUserExists(uid);
+      // Check if user profile exists in Firestore or local storage
+      const existsRemote = await checkUserExists(uid);
+      const existsLocal = await hasLocalProfileForIdentity({ email: user.email });
 
-      if (exists) {
-        await get().loadUserProfile();
+      if (existsRemote || existsLocal) {
+        if (existsRemote) {
+          await get().loadUserProfile();
+        } else {
+          const localUser = await loadUserProfileFromLocal();
+          if (localUser) {
+            set({ currentUser: localUser });
+          }
+        }
+
+        // Prefer the active Google account name in UI to avoid stale/local aliases.
+        set((state) => {
+          const googleName = user.displayName?.trim();
+          const googleEmail = user.email?.trim();
+          const current = state.currentUser;
+
+          if (!current) {
+            return {
+              currentUser: {
+                phoneNumber: '',
+                fullName: googleName || 'User',
+                displayName: googleName || 'User',
+                email: googleEmail || '',
+                userType: UserType.STUDENT,
+                monthlyIncome: 0,
+                riskTolerance: RiskTolerance.MODERATE,
+                createdAt: Date.now(),
+              },
+            };
+          }
+
+          return {
+            currentUser: {
+              ...current,
+              displayName: googleName || current.displayName || current.fullName,
+              email: googleEmail || current.email,
+            },
+          };
+        });
+
         set({ isLoggedIn: true, isGoogleLoading: false });
         return { success: true, isNewUser: false };
       } else {
@@ -240,6 +358,185 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         authError: error.message || 'Google sign-in failed',
       });
       return { success: false, isNewUser: false };
+    }
+  },
+
+  signInWithEmail: async (email: string) => {
+    const cleanEmail = email.trim().toLowerCase();
+    if (!/^\S+@\S+\.\S+$/.test(cleanEmail)) {
+      set({ authError: 'Please enter a valid email address' });
+      return { success: false, message: 'Please enter a valid email address' };
+    }
+
+    set({ isGoogleLoading: true, authError: null });
+
+    try {
+      // Fast local check first for offline continuity.
+      const localEntries = await AsyncStorage.multiGet([
+        'firebaseUid',
+        'user_email',
+        'user_fullName',
+        'user_userType',
+        'user_monthlyIncome',
+        'user_riskTolerance',
+      ]);
+      const localMap = Object.fromEntries(localEntries);
+      const localEmail = (localMap.user_email || '').trim().toLowerCase();
+
+      if (localEmail && localEmail === cleanEmail) {
+        const localUser: User = {
+          phoneNumber: '',
+          fullName: localMap.user_fullName || 'User',
+          displayName: localMap.user_fullName || 'User',
+          email: cleanEmail,
+          userType: (localMap.user_userType as UserType) || UserType.STUDENT,
+          monthlyIncome: parseFloat(localMap.user_monthlyIncome || '0'),
+          riskTolerance: (localMap.user_riskTolerance as RiskTolerance) || RiskTolerance.MODERATE,
+          createdAt: Date.now(),
+        };
+
+        set({
+          firebaseUid: localMap.firebaseUid || `email-${Date.now()}`,
+          currentUser: localUser,
+          isLoggedIn: true,
+          isGoogleLoading: false,
+        });
+
+        return { success: true };
+      }
+
+      const profile = await apiService.getProfileByEmail(cleanEmail);
+      if (!profile) {
+        set({
+          isGoogleLoading: false,
+          authError: 'No account found with this email. Please create your account.',
+        });
+        return { success: false, message: 'No account found' };
+      }
+
+      const userId = profile.user_id || profile.firebase_uid || `email-${Date.now()}`;
+      const resolvedName = profile.display_name || profile.full_name || profile.name || 'User';
+      const resolvedUserType = (profile.user_type as UserType) || UserType.STUDENT;
+      const resolvedRisk = (profile.risk_tolerance as RiskTolerance) || RiskTolerance.MODERATE;
+      const resolvedIncome = Number(profile.monthly_income || 0);
+
+      await AsyncStorage.multiSet([
+        ['firebaseUid', userId],
+        ['user_fullName', resolvedName],
+        ['user_email', cleanEmail],
+        ['user_userType', resolvedUserType],
+        ['user_monthlyIncome', String(resolvedIncome)],
+        ['user_riskTolerance', resolvedRisk],
+      ]);
+
+      const signedUser: User = {
+        phoneNumber: profile.phone_number || '',
+        fullName: resolvedName,
+        displayName: resolvedName,
+        email: cleanEmail,
+        userType: resolvedUserType,
+        monthlyIncome: resolvedIncome,
+        riskTolerance: resolvedRisk,
+        createdAt: Date.now(),
+      };
+
+      set({
+        firebaseUid: userId,
+        currentUser: signedUser,
+        isLoggedIn: true,
+        isGoogleLoading: false,
+      });
+
+      return { success: true };
+    } catch (error: any) {
+      set({
+        isGoogleLoading: false,
+        authError: error?.message || 'Sign in failed. Please try again.',
+      });
+      return { success: false, message: error?.message || 'Sign in failed' };
+    }
+  },
+
+  signUpWithEmail: async (fullName: string, email: string) => {
+    const cleanName = fullName.trim();
+    const cleanEmail = email.trim().toLowerCase();
+
+    if (!cleanName) {
+      set({ authError: 'Full name is required' });
+      return { success: false, message: 'Full name is required' };
+    }
+
+    if (!/^\S+@\S+\.\S+$/.test(cleanEmail)) {
+      set({ authError: 'Please enter a valid email' });
+      return { success: false, message: 'Please enter a valid email' };
+    }
+
+    set({ isGoogleLoading: true, authError: null });
+
+    try {
+      const userId = `email-${Date.now()}`;
+
+      // Try Mongo persistence, but don't block signup if backend is offline.
+      try {
+        await apiService.saveProfile({
+          user_id: userId,
+          firebase_uid: userId,
+          name: cleanName,
+          full_name: cleanName,
+          display_name: cleanName,
+          email: cleanEmail,
+          phone_number: '',
+          user_type: UserType.STUDENT,
+          risk_tolerance: RiskTolerance.MODERATE,
+          age: 25,
+          gender: 'other',
+          state: 'Delhi',
+          occupation: 'student',
+          employment_type: 'student',
+          monthly_income: 0,
+          monthly_expenses: 0,
+          total_savings: 0,
+          total_debts: 0,
+          family_size: 1,
+        });
+      } catch (mongoError) {
+        console.warn('Email signup Mongo save skipped:', mongoError);
+      }
+
+      await AsyncStorage.multiSet([
+        ['firebaseUid', userId],
+        ['user_fullName', cleanName],
+        ['user_email', cleanEmail],
+        ['user_userType', UserType.STUDENT],
+        ['user_monthlyIncome', '0'],
+        ['user_riskTolerance', RiskTolerance.MODERATE],
+      ]);
+
+      const newUser: User = {
+        phoneNumber: '',
+        fullName: cleanName,
+        displayName: cleanName,
+        email: cleanEmail,
+        userType: UserType.STUDENT,
+        monthlyIncome: 0,
+        riskTolerance: RiskTolerance.MODERATE,
+        createdAt: Date.now(),
+      };
+
+      set({
+        firebaseUid: userId,
+        currentUser: newUser,
+        isLoggedIn: true,
+        isGoogleLoading: false,
+      });
+
+      return { success: true };
+    } catch (error: any) {
+      set({
+        isGoogleLoading: false,
+        authError: error?.message || 'Sign up failed. Please try again.',
+      });
+      return { success: false, message: error?.message || 'Sign up failed' };
     }
   },
 
@@ -388,9 +685,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const profile = await getUserProfile(uid);
       
       if (profile) {
+        const resolvedName = profile.displayName || profile.fullName || profile.full_name || profile.name || '';
         const user: User = {
           phoneNumber: profile.phoneNumber || '',
-          fullName: profile.fullName || '',
+          fullName: resolvedName,
+          displayName: resolvedName,
           email: profile.email || '',
           userType: profile.userType as UserType,
           monthlyIncome: profile.monthlyIncome || 0,
@@ -437,20 +736,17 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   initialize: async () => {
     try {
       const uid = await AsyncStorage.getItem('firebaseUid');
-      
+
+      // Require explicit login on app launch instead of silent auto-login.
       if (uid) {
-        set({ firebaseUid: uid });
-        
-        // Check if profile exists
-        const exists = await checkUserExists(uid);
-        
-        if (exists) {
-          await get().loadUserProfile();
-          set({ isLoggedIn: true, isInitialized: true });
-          return;
+        try {
+          await signOutUser();
+        } catch (error) {
+          console.warn('Session sign-out on init failed:', error);
         }
       }
-      
+
+      await AsyncStorage.multiRemove(['firebaseUid', 'phoneNumber']);
       set({ isLoggedIn: false, isInitialized: true });
     } catch (error) {
       console.error('Error initializing auth:', error);

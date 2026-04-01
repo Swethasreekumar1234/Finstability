@@ -3,7 +3,7 @@
  * Apple/Stripe inspired dark theme with glassmorphism
  */
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -19,8 +19,8 @@ import * as Google from 'expo-auth-session/providers/google';
 import { RootStackParamList } from '../types';
 import { useAuthStore } from '../store/authStore';
 import { AIColors, AISpacing, AIRadius, AIShadows, AITypography } from '../theme/aiTheme';
-import { GOOGLE_CONFIG } from '../config/google';
 import { GridBackdrop } from '../components/ui';
+import { GOOGLE_CONFIG } from '../config/google';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -30,6 +30,7 @@ type Props = {
 
 export default function LoginScreen({ navigation }: Props) {
   const { signInWithGoogle, isGoogleLoading, authError, clearError } = useAuthStore();
+  const [localError, setLocalError] = useState<string | null>(null);
   
   // Animations
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -41,6 +42,9 @@ export default function LoginScreen({ navigation }: Props) {
     clientId: GOOGLE_CONFIG.webClientId,
     androidClientId: GOOGLE_CONFIG.androidClientId,
     iosClientId: GOOGLE_CONFIG.iosClientId,
+    extraParams: {
+      prompt: 'select_account',
+    },
   });
 
   useEffect(() => {
@@ -83,37 +87,46 @@ export default function LoginScreen({ navigation }: Props) {
   }, []);
 
   useEffect(() => {
+    clearError();
+    setLocalError(null);
+  }, []);
+
+  useEffect(() => {
     if (response?.type === 'success') {
       const { params } = response;
       if (params.id_token) {
-        handleGoogleSignIn(params.id_token);
+        void handleGoogleLogin(params.id_token);
       }
     }
   }, [response]);
-
-  useEffect(() => {
-    clearError();
-  }, []);
-
-  const handleGoogleSignIn = async (idToken: string) => {
-    const result = await signInWithGoogle(idToken);
-    if (result.success) {
-      navigation.reset({
-        index: 0,
-        routes: [{ name: result.isNewUser ? 'ProfileSetup' : 'Dashboard' }],
-      });
-    }
-  };
 
   const handlePhoneLogin = () => {
     clearError();
     navigation.navigate('PhoneLogin');
   };
 
+  const handleEmailSignin = () => {
+    clearError();
+    setLocalError(null);
+    navigation.navigate('EmailSignin');
+  };
+
+  const handleGoogleLogin = async (idToken: string) => {
+    setLocalError(null);
+    const result = await signInWithGoogle(idToken);
+    if (!result.success) return;
+
+    navigation.reset({
+      index: 0,
+      routes: [{ name: result.isNewUser ? 'ProfileSetup' : 'Dashboard' }],
+    });
+  };
+
   const handleGooglePress = async () => {
     clearError();
+    setLocalError(null);
     try {
-      await promptAsync();
+      await promptAsync({ showInRecents: true });
     } catch (error) {
       console.error('Google prompt error:', error);
     }
@@ -167,10 +180,10 @@ export default function LoginScreen({ navigation }: Props) {
 
           {/* Auth Section */}
           <View style={styles.authSection}>
-            {authError && (
+            {(localError || authError) && (
               <View style={styles.errorContainer}>
                 <Text style={styles.errorIcon}>!</Text>
-                <Text style={styles.errorText}>{authError}</Text>
+                <Text style={styles.errorText}>{localError || authError}</Text>
               </View>
             )}
 
@@ -192,7 +205,20 @@ export default function LoginScreen({ navigation }: Props) {
               <View style={styles.dividerLine} />
             </View>
 
-            {/* Google Login - Secondary */}
+            <TouchableOpacity
+              style={styles.secondaryButton}
+              onPress={handleEmailSignin}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.secondaryButtonText}>Sign In with Email</Text>
+            </TouchableOpacity>
+
+            <View style={styles.divider}>
+              <View style={styles.dividerLine} />
+              <Text style={styles.dividerText}>or</Text>
+              <View style={styles.dividerLine} />
+            </View>
+
             <TouchableOpacity
               style={[styles.secondaryButton, !request && styles.buttonDisabled]}
               onPress={handleGooglePress}
@@ -206,10 +232,11 @@ export default function LoginScreen({ navigation }: Props) {
                   <View style={styles.googleIcon}>
                     <Text style={styles.googleG}>G</Text>
                   </View>
-                  <Text style={styles.secondaryButtonText}>Continue with Google</Text>
+                  <Text style={styles.secondaryButtonText}>Login with Google</Text>
                 </>
               )}
             </TouchableOpacity>
+
           </View>
 
           {/* Footer */}

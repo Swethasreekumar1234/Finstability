@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Optional, List
+from typing import Optional, List, Literal, Dict
 from pydantic import BaseModel
 
 
@@ -93,3 +93,39 @@ class InvestmentRecommendationsResponse(BaseModel):
     recommended_monthly_investment: float
     primary_recommendation: str
     reasoning: str
+
+
+class TransactionIn(BaseModel):
+    user_id: str
+    date: str
+    amount: float
+    type: Literal["income", "expense"]
+    category: Optional[str] = None
+    merchant: str
+    source: Literal["manual", "bank_upload"] = "manual"
+
+
+class BudgetIn(BaseModel):
+    user_id: str
+    category: str
+    monthly_limit: float
+
+
+class TransactionOut(BaseModel):
+    user_id: str
+    date: str
+    amount: float
+    type: Literal["income", "expense"]
+    category: str
+    merchant: str
+    source: Literal["manual", "bank_upload"]
+    created_at: str
+
+
+class MonthlySummaryResponse(BaseModel):
+    total_income: float
+    total_expenses: float
+    savings: float
+    expense_ratio: float
+    category_breakdown: Dict[str, float]
+    alerts: List[str]

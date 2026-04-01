@@ -10,6 +10,8 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types';
 import {
   LoginScreen,
+  EmailSigninScreen,
+  EmailSignupScreen,
   PhoneLoginScreen,
   OtpVerificationScreen,
   ProfileSetupScreen,
@@ -18,6 +20,10 @@ import {
   TipsScreen,
   InvestmentRecommendationsScreen,
   AIChatScreen,
+  TransactionsScreen,
+  AddTransactionScreen,
+  UploadStatementScreen,
+  SpendingInsightsScreen,
 } from '../screens';
 import TabNavigator from './TabNavigator';
 import { useAuthStore } from '../store/authStore';
@@ -80,6 +86,8 @@ export default function AppNavigator() {
         }}
       >
         <Stack.Screen name="Login" component={LoginScreen} />
+        <Stack.Screen name="EmailSignin" component={EmailSigninScreen} />
+        <Stack.Screen name="EmailSignup" component={EmailSignupScreen} />
         <Stack.Screen name="PhoneLogin" component={PhoneLoginScreen} />
         <Stack.Screen name="OtpVerification" component={OtpVerificationScreen} />
         <Stack.Screen name="ProfileSetup" component={ProfileSetupScreen} />
@@ -104,6 +112,26 @@ export default function AppNavigator() {
           name="AIChat"
           component={AIChatScreen}
           options={{ animation: 'slide_from_bottom' }}
+        />
+        <Stack.Screen
+          name="Transactions"
+          component={TransactionsScreen}
+          options={{ animation: 'slide_from_right' }}
+        />
+        <Stack.Screen
+          name="AddTransaction"
+          component={AddTransactionScreen}
+          options={{ animation: 'slide_from_bottom' }}
+        />
+        <Stack.Screen
+          name="UploadStatement"
+          component={UploadStatementScreen}
+          options={{ animation: 'slide_from_bottom' }}
+        />
+        <Stack.Screen
+          name="SpendingInsights"
+          component={SpendingInsightsScreen}
+          options={{ animation: 'slide_from_right' }}
         />
       </Stack.Navigator>
     </NavigationContainer>

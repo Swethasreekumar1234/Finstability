@@ -3,7 +3,7 @@
  * Falls back gracefully when the backend is unavailable.
  */
 
-const API_BASE = 'http://localhost:8000';
+const API_BASE = 'http://localhost:8081';
 
 // ─── Request/Response types ────────────────────────────────────────────────
 
@@ -92,6 +92,35 @@ export interface BenefitEstimateResponse {
   breakdown: Array<{ scheme_name: string; annual_amount: number; category: string }>;
 }
 
+export interface TransactionItem {
+  user_id: string;
+  date: string;
+  amount: number;
+  type: 'income' | 'expense';
+  category: string;
+  merchant: string;
+  source: 'manual' | 'bank_upload';
+  created_at: string;
+}
+
+export interface AddTransactionPayload {
+  user_id: string;
+  date: string;
+  amount: number;
+  type: 'income' | 'expense';
+  merchant: string;
+  category?: string;
+}
+
+export interface MonthlySummary {
+  total_income: number;
+  total_expenses: number;
+  savings: number;
+  expense_ratio: number;
+  category_breakdown: Record<string, number>;
+  alerts: string[];
+}
+
 // ─── Internal fetch helper ─────────────────────────────────────────────────
 
 async function post<T>(path: string, body: unknown): Promise<T> {
@@ -113,11 +142,37 @@ async function post<T>(path: string, body: unknown): Promise<T> {
   }
 }
 
+async function get<T>(path: string): Promise<T> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 10000);
+  try {
+    const res = await fetch(`${API_BASE}${path}`, {
+      method: 'GET',
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+    if (!res.ok) throw new Error(`API ${res.status}`);
+    return res.json() as Promise<T>;
+  } catch (err) {
+    clearTimeout(timer);
+    throw err;
+  }
+}
+
 // ─── Public API ────────────────────────────────────────────────────────────
 
 export const apiService = {
   async saveProfile(profile: BackendProfile): Promise<void> {
     await post('/profile/', profile);
+  },
+
+  async getProfileByEmail(email: string): Promise<BackendProfile | null> {
+    try {
+      const query = encodeURIComponent(email.trim().toLowerCase());
+      return await get<BackendProfile>(`/profile/by-email?email=${query}`);
+    } catch {
+      return null;
+    }
   },
 
   async recommendSchemes(profile: BackendProfile): Promise<EligibleSchemesResponse> {
@@ -143,5 +198,59 @@ export const apiService = {
     } catch {
       return false;
     }
+  },
+
+  async addTransaction(payload: AddTransactionPayload): Promise<TransactionItem> {
+    const res = await post<{ message: string; transaction: TransactionItem }>('/transactions/add-transaction', payload);
+    return res.transaction;
+  },
+
+  async listTransactions(userId: string, month?: string, category?: string): Promise<TransactionItem[]> {
+    const params = new URLSearchParams({ user_id: userId });
+    if (month) params.append('month', month);
+    if (category && category !== 'all') params.append('category', category);
+    const res = await get<{ transactions: TransactionItem[] }>(`/transactions/list?${params.toString()}`);
+    return res.transactions;
+  },
+
+  async uploadBankStatement(userId: string, uri: string, filename: string, mimeType: string): Promise<{ inserted: number; duplicates: number; total_rows: number }> {
+    const form = new FormData();
+    form.append('user_id', userId);
+    form.append('file', {
+      uri,
+      name: filename,
+      type: mimeType || 'application/octet-stream',
+    } as any);
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 30000);
+
+    try {
+      const res = await fetch(`${API_BASE}/transactions/upload-bank-statement`, {
+        method: 'POST',
+        body: form,
+        signal: controller.signal,
+      });
+      clearTimeout(timer);
+      if (!res.ok) throw new Error(`API ${res.status}`);
+      return res.json();
+    } catch (err) {
+      clearTimeout(timer);
+      throw err;
+    }
+  },
+
+  async getMonthlySummary(userId: string, month: string): Promise<MonthlySummary> {
+    const params = new URLSearchParams({ user_id: userId, month });
+    return get<MonthlySummary>(`/transactions/monthly-summary?${params.toString()}`);
+  },
+
+  async setBudget(user_id: string, category: string, monthly_limit: number): Promise<void> {
+    await post('/transactions/set-budget', { user_id, category, monthly_limit });
+  },
+
+  async getHealthMetrics(userId: string, month: string): Promise<{ total_savings: number; expense_ratio: number; total_income: number; total_expenses: number }> {
+    const params = new URLSearchParams({ user_id: userId, month });
+    return get(`/transactions/health-metrics?${params.toString()}`);
   },
 };

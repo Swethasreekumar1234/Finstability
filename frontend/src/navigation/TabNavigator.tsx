@@ -1,6 +1,6 @@
 /**
  * Bottom Tab Navigator
- * Five-tab layout with intent labels: Home · Plan · Goals · Discover · Profile
+ * Bottom-tab layout with intent labels
  */
 
 import React from 'react';
@@ -13,6 +13,7 @@ import { AIColors, AIRadius, AITypography } from '../theme/aiTheme';
 // Screens
 import DashboardScreen from '../screens/DashboardScreen';
 import PlanScreen from '../screens/PlanScreen';
+import TransactionsScreen from '../screens/TransactionsScreen';
 import GoalsScreen from '../screens/GoalsScreen';
 import BenefitsScreen from '../screens/BenefitsScreen';
 import FinancialProfileScreen from '../screens/FinancialProfileScreen';
@@ -24,6 +25,7 @@ type IoniconsName = React.ComponentProps<typeof Ionicons>['name'];
 const TAB_ICONS: Record<keyof TabParamList, { active: IoniconsName; inactive: IoniconsName }> = {
   Home:     { active: 'home',             inactive: 'home-outline' },
   Health:   { active: 'heart',            inactive: 'heart-outline' },
+  Transactions: { active: 'wallet',       inactive: 'wallet-outline' },
   Goals:    { active: 'flag',             inactive: 'flag-outline' },
   Benefits: { active: 'shield-checkmark', inactive: 'shield-checkmark-outline' },
   Profile:  { active: 'person',           inactive: 'person-outline' },
@@ -52,6 +54,7 @@ export default function TabNavigator() {
     >
       <Tab.Screen name="Home" component={DashboardScreen} options={{ tabBarLabel: 'Home' }} />
       <Tab.Screen name="Health" component={PlanScreen} options={{ tabBarLabel: 'Plan' }} />
+      <Tab.Screen name="Transactions" component={TransactionsScreen} options={{ tabBarLabel: 'Transactions' }} />
       <Tab.Screen name="Goals" component={GoalsScreen} options={{ tabBarLabel: 'Goals' }} />
       <Tab.Screen name="Benefits" component={BenefitsScreen} options={{ tabBarLabel: 'Discover' }} />
       <Tab.Screen name="Profile" component={FinancialProfileScreen} options={{ tabBarLabel: 'Profile' }} />

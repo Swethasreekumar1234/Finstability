@@ -17,6 +17,7 @@ import {
 import Slider from '@react-native-community/slider';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RouteProp } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   EmploymentType,
@@ -37,6 +38,7 @@ const FINANCIAL_PROFILE_KEY = 'financial_profile';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'FinancialInput'>;
+  route: RouteProp<RootStackParamList, 'FinancialInput'>;
 };
 
 function money(n: number): string {
@@ -58,7 +60,7 @@ const EMPLOYMENT_OPTIONS = [
 const RISK_OPTIONS = [RiskTolerance.LOW, RiskTolerance.MODERATE, RiskTolerance.HIGH];
 const GOAL_OPTIONS = Object.values(FinancialGoal);
 
-export default function FinancialInputScreen({ navigation }: Props) {
+export default function FinancialInputScreen({ navigation, route }: Props) {
   const { currentUser, firebaseUid } = useAuthStore();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(true);
@@ -159,9 +161,12 @@ export default function FinancialInputScreen({ navigation }: Props) {
         console.warn('Mongo financial profile sync skipped:', mongoError);
       }
 
-      Alert.alert('Profile saved', 'Your financial profile has been updated.', [
-        { text: 'OK', onPress: () => navigation.goBack() },
-      ]);
+      // Redirect immediately after save so the flow continues without extra taps.
+      if (route.params?.fromOnboarding || !navigation.canGoBack()) {
+        navigation.reset({ index: 0, routes: [{ name: 'Dashboard' }] });
+      } else {
+        navigation.goBack();
+      }
     } catch {
       Alert.alert('Save failed', 'Could not save profile. Please try again.');
     } finally {

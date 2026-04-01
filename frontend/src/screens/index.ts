@@ -1,4 +1,6 @@
 export { default as LoginScreen } from './LoginScreen';
+export { default as EmailSigninScreen } from './EmailSigninScreen';
+export { default as EmailSignupScreen } from './EmailSignupScreen';
 export { default as PhoneLoginScreen } from './PhoneLoginScreen';
 export { default as OtpVerificationScreen } from './OtpVerificationScreen';
 export { default as ProfileSetupScreen } from './ProfileSetupScreen';
@@ -11,3 +13,7 @@ export { default as BenefitsScreen } from './BenefitsScreen';
 export { default as TipsScreen } from './TipsScreen';
 export { default as InvestmentRecommendationsScreen } from './InvestmentRecommendationsScreen';
 export { default as AIChatScreen } from './AIChatScreen';
+export { default as TransactionsScreen } from './TransactionsScreen';
+export { default as AddTransactionScreen } from './AddTransactionScreen';
+export { default as UploadStatementScreen } from './UploadStatementScreen';
+export { default as SpendingInsightsScreen } from './SpendingInsightsScreen';
