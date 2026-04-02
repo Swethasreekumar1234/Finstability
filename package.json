@@ -1,0 +1,21 @@
+{
+  "name": "finstability",
+  "version": "1.0.0",
+  "description": "A personal finance app built with React Native and Expo.",
+  "main": "index.js",
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Swethasreekumar1234/Finstability.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Swethasreekumar1234/Finstability/issues"
+  },
+  "homepage": "https://github.com/Swethasreekumar1234/Finstability#readme"
+}
