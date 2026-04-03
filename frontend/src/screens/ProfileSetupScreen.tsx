@@ -172,7 +172,7 @@ export default function ProfileSetupScreen({ navigation }: Props) {
             <View style={styles.stepHeader}>
               <Text style={styles.stepIcon}>01</Text>
               <Text style={styles.stepTitle}>Personal Information</Text>
-              <Text style={styles.stepSubtitle}>Let's get to know you better</Text>
+              <Text style={styles.stepSubtitle}>Let&apos;s get to know you better</Text>
             </View>
 
             <View style={styles.inputGroup}>

@@ -69,7 +69,7 @@ export default function EmailSigninScreen({ navigation }: Props) {
             </TouchableOpacity>
 
             <View style={styles.linkRow}>
-              <Text style={styles.linkText}>Don't have an account? </Text>
+              <Text style={styles.linkText}>Don&apos;t have an account? </Text>
               <TouchableOpacity onPress={() => navigation.navigate('EmailSignup')}>
                 <Text style={styles.linkCta}>Create your account</Text>
               </TouchableOpacity>

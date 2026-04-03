@@ -5,6 +5,7 @@
 
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import {
+  initializeAuth,
   getAuth,
   PhoneAuthProvider,
   signInWithCredential,
@@ -23,7 +24,14 @@ import {
   setDoc,
   serverTimestamp,
 } from 'firebase/firestore';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
+import type { Auth } from 'firebase/auth';
+import type { Persistence } from 'firebase/auth';
+
+const { getReactNativePersistence } = require('firebase/auth') as {
+  getReactNativePersistence: (storage: typeof AsyncStorage) => unknown;
+};
 
 // Firebase configuration from your existing project
 const firebaseConfig = {
@@ -39,7 +47,19 @@ const firebaseConfig = {
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
 // Firebase services
-export const auth = getAuth(app);
+let auth: Auth;
+
+try {
+  auth = Platform.OS === 'web'
+    ? getAuth(app)
+    : initializeAuth(app, {
+        persistence: getReactNativePersistence(AsyncStorage) as Persistence,
+      });
+} catch {
+  auth = getAuth(app);
+}
+
+export { auth };
 export const db = getFirestore(app);
 
 // Set language for phone auth
