@@ -41,7 +41,6 @@ export default function LoginScreen({ navigation }: Props) {
   const [request, response, promptAsync] = Google.useIdTokenAuthRequest({
     clientId: GOOGLE_CONFIG.webClientId,
     androidClientId: GOOGLE_CONFIG.androidClientId,
-    iosClientId: GOOGLE_CONFIG.iosClientId,
     extraParams: {
       prompt: 'select_account',
     },
@@ -113,13 +112,17 @@ export default function LoginScreen({ navigation }: Props) {
 
   const handleGoogleLogin = async (idToken: string) => {
     setLocalError(null);
-    const result = await signInWithGoogle(idToken);
-    if (!result.success) return;
+    try {
+      const result = await signInWithGoogle(idToken);
+      if (!result.success) return;
 
-    navigation.reset({
-      index: 0,
-      routes: [{ name: result.isNewUser ? 'ProfileSetup' : 'Dashboard' }],
-    });
+      navigation.reset({
+        index: 0,
+        routes: [{ name: result.isNewUser ? 'ProfileSetup' : 'Dashboard' }],
+      });
+    } catch (error: any) {
+      setLocalError(error?.message || 'Google sign-in failed');
+    }
   };
 
   const handleGooglePress = async () => {

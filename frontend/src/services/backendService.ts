@@ -1,4 +1,6 @@
-const BACKEND_URL = 'http://localhost:8081';
+import { getBackendBaseUrl } from '../config/backend';
+
+const BACKEND_URL = getBackendBaseUrl();
 
 export interface BackendScheme {
   scheme_name: string;

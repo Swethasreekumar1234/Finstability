@@ -221,7 +221,9 @@ export default function OtpVerificationScreen({ navigation, route }: Props) {
               {otp.map((digit, index) => (
                 <View key={index} style={styles.otpInputWrapper}>
                   <TextInput
-                    ref={(ref) => (inputRefs.current[index] = ref)}
+                    ref={(ref) => {
+                      inputRefs.current[index] = ref;
+                    }}
                     style={[
                       styles.otpInput,
                       digit && styles.otpInputFilled,
@@ -243,7 +245,7 @@ export default function OtpVerificationScreen({ navigation, route }: Props) {
               {canResend ? (
                 <TouchableOpacity onPress={handleResend} disabled={isOtpLoading}>
                   <Text style={styles.resendActiveText}>
-                    Didn't receive code? <Text style={styles.resendLink}>Resend</Text>
+                    Didn&apos;t receive code? <Text style={styles.resendLink}>Resend</Text>
                   </Text>
                 </TouchableOpacity>
               ) : (

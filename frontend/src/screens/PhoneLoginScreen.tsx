@@ -154,8 +154,8 @@ export default function PhoneLoginScreen({ navigation }: Props) {
                 <Text style={styles.phoneIcon}>◎</Text>
               </View>
               <Text style={styles.title}>Enter Your Phone</Text>
-              <Text style={styles.subtitle}>
-                We'll send you a verification code to confirm your identity
+                <Text style={styles.subtitle}>
+                We&apos;ll send you a verification code to confirm your identity
               </Text>
             </View>
 

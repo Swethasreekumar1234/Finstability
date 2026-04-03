@@ -18,8 +18,6 @@ export const GOOGLE_CONFIG = {
   webClientId: '793985902050-fh14tv9v63afmojstglvmh7a4sfr2vti.apps.googleusercontent.com',
   // Android Client ID (from google-services.json)
   androidClientId: '793985902050-hm0bu890qe1f2hi5dbvfr9re7lp7pq0e.apps.googleusercontent.com',
-  // iOS Client ID
-  iosClientId: '793985902050-YOUR_IOS_CLIENT_ID.apps.googleusercontent.com',
 };
 
 /**
@@ -36,7 +34,6 @@ export const useGoogleAuth = () => {
   return Google.useIdTokenAuthRequest({
     clientId: GOOGLE_CONFIG.webClientId,
     androidClientId: GOOGLE_CONFIG.androidClientId,
-    iosClientId: GOOGLE_CONFIG.iosClientId,
   });
 };
 

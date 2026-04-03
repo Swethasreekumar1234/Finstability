@@ -125,7 +125,7 @@ export default function BenefitsScreen() {
 
         {/* Missing Benefits Hero */}
         <View style={st.hero}>
-          <Text style={st.heroTag}>Estimated Benefits You're Missing</Text>
+          <Text style={st.heroTag}>Estimated Benefits You&apos;re Missing</Text>
           <Text style={st.heroAmount}>{fmt(totalBenefits)}<Text style={st.heroYear}>/year</Text></Text>
           {missingCount > 0 && (
             <Text style={st.heroSub}>{missingCount} more scheme{missingCount !== 1 ? 's' : ''} may also apply</Text>

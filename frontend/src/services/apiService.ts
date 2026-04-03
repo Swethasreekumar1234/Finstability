@@ -3,7 +3,9 @@
  * Falls back gracefully when the backend is unavailable.
  */
 
-const API_BASE = 'http://localhost:8081';
+import { getBackendBaseUrl } from '../config/backend';
+
+const API_BASE = getBackendBaseUrl();
 
 // ─── Request/Response types ────────────────────────────────────────────────
 
