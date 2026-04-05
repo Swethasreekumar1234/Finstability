@@ -182,9 +182,26 @@ export default function LoginScreen({ navigation }: Props) {
       if (result?.type === 'success') {
         const tokens = await extractGoogleTokens(result);
         await processGoogleTokens(tokens);
+        return;
+      }
+
+      if (result?.type === 'cancel' || result?.type === 'dismiss') {
+        return;
+      }
+
+      if (result?.type === 'error') {
+        const message = result?.error?.message || result?.errorCode || 'Google sign-in failed';
+        if (!/abort|cancel/i.test(message)) {
+          setLocalError(message);
+        }
       }
     } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (/abort|cancel/i.test(message)) {
+        return;
+      }
       console.error('Google prompt error:', error);
+      setLocalError(message || 'Google sign-in failed');
     }
   };
 

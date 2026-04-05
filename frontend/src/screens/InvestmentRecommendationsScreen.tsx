@@ -18,7 +18,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AIColors, AIRadius, AISpacing, AIShadows, AITypography } from '../theme/aiTheme';
 import { FinancialProfile, RootStackParamList } from '../types';
-import { apiService, InvestmentPortfolio } from '../services/apiService';
+import { apiService, InvestmentPortfolio, FundNavSnapshot } from '../services/apiService';
 import { GridBackdrop, ScreenHeader } from '../components/ui';
 
 const FINANCIAL_PROFILE_KEY = 'financial_profile';
@@ -96,6 +96,44 @@ function riskColor(level: string): string {
   return AIColors.warning;
 }
 
+function formatDate(value?: string): string {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString('en-IN', {
+    day: '2-digit',
+    month: 'short',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
+
+function explainAllocationName(name: string): string {
+  const value = name.toLowerCase();
+  if (value.includes('mid') || value.includes('small')) return 'Faster-growing companies with higher volatility.';
+  if (value.includes('large') || value.includes('index')) return 'Established companies that offer more stability.';
+  if (value.includes('international')) return 'Global diversification beyond domestic markets.';
+  if (value.includes('elss')) return 'Tax-saving equity allocation with lock-in period.';
+  if (value.includes('debt') || value.includes('bond') || value.includes('liquid') || value.includes('fd')) return 'Income-focused instruments with lower risk.';
+  if (value.includes('gold')) return 'Inflation hedge and diversification support.';
+  if (value.includes('reit')) return 'Real-estate exposure without direct property purchase.';
+  return 'Part of a diversified portfolio allocation.';
+}
+
+function plainPlanLabel(level: string): string {
+  const value = level.toLowerCase();
+  if (value.includes('low') || value.includes('conservative')) return 'Stable Plan';
+  if (value.includes('high') || value.includes('aggressive')) return 'Growth-focused Plan';
+  return 'Balanced Plan';
+}
+
+function riskRank(level: string): number {
+  const value = level.toLowerCase();
+  if (value.includes('low') || value.includes('conservative')) return 1;
+  if (value.includes('high') || value.includes('aggressive')) return 3;
+  return 2;
+}
+
 export default function InvestmentRecommendationsScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [loading, setLoading] = useState(true);
@@ -103,6 +141,11 @@ export default function InvestmentRecommendationsScreen() {
   const [monthlyAmount, setMonthlyAmount] = useState(0);
   const [primary, setPrimary] = useState('Balanced Growth Mix');
   const [reasoning, setReasoning] = useState('Based on income, savings and debt profile.');
+  const [asOf, setAsOf] = useState<string | null>(null);
+  const [mode, setMode] = useState<'beginner' | 'confident'>('beginner');
+  const [expandedCards, setExpandedCards] = useState<Record<string, boolean>>({});
+  const [showAlternatives, setShowAlternatives] = useState(false);
+  const [showGlossary, setShowGlossary] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -118,12 +161,25 @@ export default function InvestmentRecommendationsScreen() {
           setMonthlyAmount(resp.recommended_monthly_investment);
           setPrimary(resp.primary_recommendation);
           setReasoning(resp.reasoning);
+          setAsOf(resp.as_of ?? null);
+          const initialExpanded: Record<string, boolean> = {};
+          resp.portfolios.forEach((portfolio) => {
+            initialExpanded[portfolio.name] = portfolio.name === resp.primary_recommendation;
+          });
+          setExpandedCards(initialExpanded);
         } catch {
           if (!active) return;
-          setPortfolios(fallbackPortfolios());
+          const fallback = fallbackPortfolios();
+          setPortfolios(fallback);
           setMonthlyAmount(3000);
           setPrimary('Balanced Growth Mix');
           setReasoning('Using offline recommendations. Start backend for live RAG-based guidance.');
+          setAsOf(null);
+          const initialExpanded: Record<string, boolean> = {};
+          fallback.forEach((portfolio) => {
+            initialExpanded[portfolio.name] = portfolio.name === 'Balanced Growth Mix';
+          });
+          setExpandedCards(initialExpanded);
         } finally {
           if (active) setLoading(false);
         }
@@ -144,6 +200,60 @@ export default function InvestmentRecommendationsScreen() {
     return data;
   }, [portfolios, primary]);
 
+  const primaryPortfolio = useMemo(
+    () => sorted.find((p) => p.name === primary) ?? sorted[0] ?? null,
+    [sorted, primary]
+  );
+
+  const saferPortfolio = useMemo(() => {
+    if (!primaryPortfolio) return null;
+    const currentRank = riskRank(primaryPortfolio.risk_level);
+    return (
+      [...portfolios]
+        .filter((p) => riskRank(p.risk_level) < currentRank)
+        .sort((a, b) => riskRank(b.risk_level) - riskRank(a.risk_level))[0] ?? null
+    );
+  }, [portfolios, primaryPortfolio]);
+
+  const portfoliosToRender = useMemo(() => {
+    if (mode === 'beginner') {
+      return primaryPortfolio ? [primaryPortfolio] : [];
+    }
+    return sorted;
+  }, [mode, primaryPortfolio, sorted]);
+
+  const alternativePortfolios = useMemo(() => {
+    if (mode !== 'beginner' || !primaryPortfolio) return [];
+    return sorted.filter((p) => p.name !== primaryPortfolio.name);
+  }, [mode, primaryPortfolio, sorted]);
+
+  const primaryRupeeSplit = useMemo(() => {
+    if (!primaryPortfolio) return [] as Array<{ name: string; amount: number }>;
+    const rows = Object.entries(primaryPortfolio.allocation || {}).map(([name, pct]) => ({
+      name,
+      amount: Math.round((monthlyAmount * Number(pct || 0)) / 100),
+    }));
+    return rows.filter((row) => row.amount > 0).sort((a, b) => b.amount - a.amount);
+  }, [primaryPortfolio, monthlyAmount]);
+
+  const modeSubtitle =
+    mode === 'beginner'
+      ? 'One clear plan with plain-language guidance.'
+      : 'Full allocation details for confident investors.';
+
+  const toggleCard = (name: string) => {
+    setExpandedCards((prev) => ({
+      ...prev,
+      [name]: !prev[name],
+    }));
+  };
+
+  const applySaferPlan = () => {
+    if (!saferPortfolio) return;
+    setPrimary(saferPortfolio.name);
+    setExpandedCards((prev) => ({ ...prev, [saferPortfolio.name]: true }));
+  };
+
   if (loading) {
     return (
       <View style={styles.center}>
@@ -158,59 +268,217 @@ export default function InvestmentRecommendationsScreen() {
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <ScreenHeader
           title="Investment Recommendations"
-          subtitle="Three portfolios tailored to your current profile."
+          subtitle={modeSubtitle}
           onBack={() => navigation.goBack()}
           backLabel="Back"
         />
+
+        <View style={styles.modeSwitcher}>
+          <TouchableOpacity
+            style={[styles.modeBtn, mode === 'beginner' && styles.modeBtnActive]}
+            onPress={() => setMode('beginner')}
+          >
+            <Text style={[styles.modeText, mode === 'beginner' && styles.modeTextActive]}>Beginner</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.modeBtn, mode === 'confident' && styles.modeBtnActive]}
+            onPress={() => setMode('confident')}
+          >
+            <Text style={[styles.modeText, mode === 'confident' && styles.modeTextActive]}>Confident</Text>
+          </TouchableOpacity>
+        </View>
 
         <View style={styles.heroCard}>
           <Text style={styles.heroLabel}>Suggested Monthly Investment</Text>
           <Text style={styles.heroAmount}>{money(monthlyAmount)}/mo</Text>
           <Text style={styles.heroReason}>{reasoning}</Text>
+          {mode === 'beginner' ? (
+            <View style={styles.beginnerExplainBox}>
+              <Text style={styles.beginnerExplainText}>
+                This amount is a starting point, not a fixed rule. You can begin small and increase over time as income grows.
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.insightPills}>
+              <View style={styles.pill}><Text style={styles.pillText}>Inputs: Age, Income, Savings, Debt</Text></View>
+              <View style={styles.pill}><Text style={styles.pillText}>Method: Profile fit + Risk alignment</Text></View>
+            </View>
+          )}
+          {asOf ? <Text style={styles.snapshotText}>AMFI snapshot updated {formatDate(asOf)}</Text> : null}
         </View>
 
-        {sorted.map((p) => {
+        {primaryPortfolio ? (
+          <View style={styles.actionCard}>
+            <Text style={styles.actionEyebrow}>Do This Now</Text>
+            <Text style={styles.actionTitle}>Start with {money(monthlyAmount)}/month in {plainPlanLabel(primaryPortfolio.risk_level)}</Text>
+            <Text style={styles.actionSubtitle}>Why this fits you: based on your current income, savings, and debt profile.</Text>
+
+            <View style={styles.actionSplitBox}>
+              <Text style={styles.actionSplitTitle}>Monthly split in rupees</Text>
+              {primaryRupeeSplit.slice(0, 4).map((row) => (
+                <View key={row.name} style={styles.actionSplitRow}>
+                  <Text style={styles.actionSplitName}>{row.name}</Text>
+                  <Text style={styles.actionSplitAmount}>{money(row.amount)}</Text>
+                </View>
+              ))}
+            </View>
+
+            <View style={styles.guardrailsBox}>
+              <Text style={styles.guardrailsText}>Start small if needed. Do not invest emergency savings. Review every 6 months.</Text>
+            </View>
+
+            {mode === 'beginner' ? (
+              <View style={styles.quickActionsRow}>
+                <TouchableOpacity style={styles.quickActionGhost} onPress={() => setShowAlternatives((v) => !v)}>
+                  <Text style={styles.quickActionGhostText}>{showAlternatives ? 'Hide other options' : 'Compare other options'}</Text>
+                </TouchableOpacity>
+                {saferPortfolio ? (
+                  <TouchableOpacity style={styles.quickActionSafe} onPress={applySaferPlan}>
+                    <Text style={styles.quickActionSafeText}>Make this safer</Text>
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+            ) : null}
+          </View>
+        ) : null}
+
+        {portfoliosToRender.map((p) => {
           const color = p.risk_color || riskColor(p.risk_level);
           const isPrimary = p.name === primary;
+          const expanded = mode === 'beginner' ? true : (expandedCards[p.name] ?? isPrimary);
           const allocationRows = Object.entries(p.allocation || {});
           const firstLink = p.platform_urls?.[0] || '';
+          const totalAllocation = allocationRows.reduce((sum, [, pct]) => sum + Number(pct || 0), 0) || 100;
+          const topMix = [...allocationRows]
+            .sort((a, b) => Number(b[1] || 0) - Number(a[1] || 0))
+            .slice(0, 2)
+            .map(([name, pct]) => `${name} ${pct}%`)
+            .join(' • ');
           return (
             <View key={p.name} style={[styles.card, isPrimary && styles.cardPrimary]}>
               <View style={styles.cardTop}>
                 <View style={[styles.riskBadge, { backgroundColor: color + '22' }]}>
-                  <Text style={[styles.riskText, { color }]}>{p.risk_level.toUpperCase()} RISK</Text>
+                  <Text style={[styles.riskText, { color }]}>{plainPlanLabel(p.risk_level).toUpperCase()}</Text>
                 </View>
-                <Text style={styles.returnText}>{p.expected_return_min}% - {p.expected_return_max}%</Text>
+                <Text style={styles.returnText}>Typical: {p.expected_return_min}% - {p.expected_return_max}%</Text>
               </View>
 
               <Text style={styles.cardTitle}>{p.name}</Text>
               <Text style={styles.cardDesc}>{p.description}</Text>
               {isPrimary && <Text style={styles.primaryNote}>Primary recommendation</Text>}
 
-              <View style={styles.allocWrap}>
-                {allocationRows.map(([name, pct]) => (
-                  <View key={name} style={styles.allocRow}>
-                    <Text style={styles.allocName}>{name}</Text>
-                    <Text style={styles.allocPct}>{pct}%</Text>
+              {!expanded ? (
+                <View style={styles.collapsedInfoBox}>
+                  <Text style={styles.collapsedLine} numberOfLines={2}>{p.explanation}</Text>
+                  <Text style={styles.collapsedLine}>Top mix: {topMix}</Text>
+                  <Text style={styles.collapsedLine}>Minimum SIP: {money(p.min_monthly_sip)}/mo</Text>
+                </View>
+              ) : null}
+
+              {mode !== 'beginner' ? (
+                <TouchableOpacity style={styles.expandBtn} onPress={() => toggleCard(p.name)}>
+                  <Text style={styles.expandBtnText}>{expanded ? 'Show less' : 'See details'}</Text>
+                </TouchableOpacity>
+              ) : null}
+
+              {expanded && (
+                <>
+                  <View style={styles.allocBar}>
+                    {allocationRows.map(([name, pct], index) => {
+                      const width = `${(Number(pct || 0) / totalAllocation) * 100}%`;
+                      const segColor = [AIColors.primary, AIColors.secondary, AIColors.warning, '#a87ee8', AIColors.error][index % 5];
+                      return <View key={`seg-${name}`} style={[styles.allocBarSeg, { width, backgroundColor: segColor }]} />;
+                    })}
                   </View>
-                ))}
-              </View>
 
-              <View style={styles.metaRow}>
-                <Text style={styles.metaText}>Minimum SIP: {money(p.min_monthly_sip)}/mo</Text>
-              </View>
+                  <View style={styles.allocWrap}>
+                    {allocationRows.map(([name, pct]) => (
+                      <View key={name} style={styles.allocRow}>
+                        <View style={styles.allocInfo}>
+                          <Text style={styles.allocName}>{name}</Text>
+                          {mode === 'beginner' ? (
+                            <Text style={styles.allocExplain}>{explainAllocationName(name)}</Text>
+                          ) : null}
+                        </View>
+                        <Text style={styles.allocPct}>{pct}%</Text>
+                      </View>
+                    ))}
+                  </View>
 
-              <TouchableOpacity
-                style={styles.cta}
-                onPress={() => {
-                  if (firstLink) Linking.openURL(firstLink);
-                }}
-              >
-                <Text style={styles.ctaText}>Start Investing</Text>
-              </TouchableOpacity>
+                  {mode === 'beginner' ? (
+                    <View style={styles.beginnerExplainBox}>
+                      <Text style={styles.beginnerExplainText}>{p.explanation}</Text>
+                    </View>
+                  ) : null}
+
+                  {p.nav_highlights?.length ? (
+                    <View style={styles.liveNavBox}>
+                      <Text style={styles.liveNavTitle}>Live AMFI matches</Text>
+                      {p.nav_highlights.map((nav: FundNavSnapshot) => (
+                        <View key={`${nav.scheme_code}-${nav.nav_date}`} style={styles.liveNavRow}>
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.liveNavName}>{nav.scheme_name}</Text>
+                            <Text style={styles.liveNavMeta}>{nav.scheme_code} • {nav.nav_date}</Text>
+                          </View>
+                          <Text style={styles.liveNavValue}>{money(nav.nav)}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  ) : null}
+
+                  <View style={styles.metaRow}>
+                    <Text style={styles.metaText}>Minimum monthly auto-invest: {money(p.min_monthly_sip)}/mo</Text>
+                  </View>
+
+                  <TouchableOpacity
+                    style={styles.cta}
+                    onPress={() => {
+                      if (firstLink) Linking.openURL(firstLink);
+                    }}
+                  >
+                    <Text style={styles.ctaText}>Start with this plan</Text>
+                  </TouchableOpacity>
+                </>
+              )}
             </View>
           );
         })}
+
+        {mode === 'beginner' && showAlternatives && alternativePortfolios.length ? (
+          <View style={styles.compareSection}>
+            <Text style={styles.compareTitle}>Other options (simple comparison)</Text>
+            {alternativePortfolios.map((p) => (
+              <TouchableOpacity
+                key={`alt-${p.name}`}
+                style={styles.compareCard}
+                onPress={() => {
+                  setPrimary(p.name);
+                  setExpandedCards((prev) => ({ ...prev, [p.name]: true }));
+                }}
+              >
+                <View style={styles.compareTopRow}>
+                  <Text style={styles.compareName}>{p.name}</Text>
+                  <Text style={styles.compareType}>{plainPlanLabel(p.risk_level)}</Text>
+                </View>
+                <Text style={styles.compareDesc} numberOfLines={2}>{p.explanation}</Text>
+                <Text style={styles.compareMeta}>Typical long-term range: {p.expected_return_min}% - {p.expected_return_max}%</Text>
+                <Text style={styles.compareMeta}>Start from: {money(p.min_monthly_sip)}/mo</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        ) : null}
+
+        <TouchableOpacity style={styles.glossaryToggle} onPress={() => setShowGlossary((v) => !v)}>
+          <Text style={styles.glossaryToggleText}>{showGlossary ? 'Hide term help' : 'Need help with terms?'}</Text>
+        </TouchableOpacity>
+
+        {showGlossary ? (
+          <View style={styles.glossaryBox}>
+            <Text style={styles.glossaryLine}>Monthly auto-invest: amount invested automatically every month.</Text>
+            <Text style={styles.glossaryLine}>Typical long-term range: possible average returns over many years.</Text>
+            <Text style={styles.glossaryLine}>Stable/Balanced/Growth-focused: lower to higher ups-and-downs in value.</Text>
+          </View>
+        ) : null}
 
         <View style={styles.notice}>
           <Text style={styles.noticeText}>Investments are market-linked. Review risk and diversify before investing.</Text>
@@ -238,6 +506,113 @@ const styles = StyleSheet.create({
   heroLabel: { ...AITypography.label, color: AIColors.textSecondary, marginBottom: 4 },
   heroAmount: { ...AITypography.displayMedium, color: AIColors.primary },
   heroReason: { ...AITypography.bodySmall, color: AIColors.textSecondary, marginTop: 6 },
+  snapshotText: { ...AITypography.labelSmall, color: AIColors.textMuted, marginTop: 10 },
+  actionCard: {
+    backgroundColor: AIColors.surface,
+    borderRadius: AIRadius.xl,
+    borderWidth: 1,
+    borderColor: AIColors.primary + '44',
+    padding: AISpacing.md,
+    marginBottom: AISpacing.md,
+  },
+  actionEyebrow: { ...AITypography.label, color: AIColors.primary, marginBottom: 6 },
+  actionTitle: { ...AITypography.h3, color: AIColors.text },
+  actionSubtitle: { ...AITypography.bodySmall, color: AIColors.textSecondary, marginTop: 6 },
+  actionSplitBox: {
+    backgroundColor: AIColors.backgroundSecondary,
+    borderWidth: 1,
+    borderColor: AIColors.border,
+    borderRadius: AIRadius.md,
+    marginTop: AISpacing.sm,
+    padding: AISpacing.sm,
+  },
+  actionSplitTitle: { ...AITypography.labelSmall, color: AIColors.textMuted, marginBottom: 6 },
+  actionSplitRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  actionSplitName: { ...AITypography.bodySmall, color: AIColors.textSecondary, flex: 1, paddingRight: 8 },
+  actionSplitAmount: { ...AITypography.bodySmall, color: AIColors.primary },
+  guardrailsBox: {
+    backgroundColor: AIColors.warningDim,
+    borderLeftWidth: 3,
+    borderLeftColor: AIColors.warning,
+    borderRadius: AIRadius.md,
+    padding: AISpacing.sm,
+    marginTop: AISpacing.sm,
+  },
+  guardrailsText: { ...AITypography.bodySmall, color: AIColors.textSecondary },
+  quickActionsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: AISpacing.sm,
+  },
+  quickActionGhost: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: AIColors.border,
+    borderRadius: AIRadius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    backgroundColor: AIColors.backgroundSecondary,
+  },
+  quickActionGhostText: { ...AITypography.buttonSmall, color: AIColors.textSecondary },
+  quickActionSafe: {
+    flex: 1,
+    borderRadius: AIRadius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    backgroundColor: AIColors.warning,
+  },
+  quickActionSafeText: { ...AITypography.buttonSmall, color: AIColors.background },
+  modeSwitcher: {
+    flexDirection: 'row',
+    backgroundColor: AIColors.surface,
+    borderWidth: 1,
+    borderColor: AIColors.border,
+    borderRadius: AIRadius.full,
+    padding: 4,
+    marginBottom: AISpacing.md,
+  },
+  modeBtn: {
+    flex: 1,
+    borderRadius: AIRadius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+  },
+  modeBtnActive: {
+    backgroundColor: AIColors.primary,
+  },
+  modeText: {
+    ...AITypography.label,
+    color: AIColors.textSecondary,
+  },
+  modeTextActive: {
+    color: AIColors.background,
+  },
+  insightPills: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: AISpacing.sm,
+  },
+  pill: {
+    backgroundColor: AIColors.backgroundSecondary,
+    borderWidth: 1,
+    borderColor: AIColors.border,
+    borderRadius: AIRadius.full,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  pillText: {
+    ...AITypography.labelSmall,
+    color: AIColors.textMuted,
+  },
   card: {
     backgroundColor: AIColors.surface,
     borderRadius: AIRadius.xl,
@@ -255,6 +630,38 @@ const styles = StyleSheet.create({
   cardTitle: { ...AITypography.h3, color: AIColors.text, marginBottom: 4 },
   cardDesc: { ...AITypography.bodySmall, color: AIColors.textSecondary, marginBottom: 8 },
   primaryNote: { ...AITypography.labelSmall, color: AIColors.primary, marginBottom: 8 },
+  collapsedInfoBox: {
+    backgroundColor: AIColors.backgroundSecondary,
+    borderRadius: AIRadius.md,
+    borderWidth: 1,
+    borderColor: AIColors.border,
+    padding: AISpacing.sm,
+    marginBottom: AISpacing.sm,
+  },
+  collapsedLine: {
+    ...AITypography.bodySmall,
+    color: AIColors.textSecondary,
+    marginBottom: 4,
+  },
+  expandBtn: {
+    alignSelf: 'flex-end',
+    marginBottom: AISpacing.sm,
+  },
+  expandBtnText: {
+    ...AITypography.labelSmall,
+    color: AIColors.textMuted,
+  },
+  allocBar: {
+    height: 10,
+    borderRadius: AIRadius.full,
+    overflow: 'hidden',
+    flexDirection: 'row',
+    marginBottom: AISpacing.sm,
+    backgroundColor: AIColors.backgroundSecondary,
+  },
+  allocBarSeg: {
+    height: 10,
+  },
   allocWrap: {
     backgroundColor: AIColors.backgroundSecondary,
     borderRadius: AIRadius.md,
@@ -263,9 +670,36 @@ const styles = StyleSheet.create({
     padding: AISpacing.sm,
     marginBottom: 8,
   },
-  allocRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
+  allocRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6, gap: 12 },
+  allocInfo: { flex: 1 },
   allocName: { ...AITypography.bodySmall, color: AIColors.textSecondary },
+  allocExplain: { ...AITypography.labelSmall, color: AIColors.textMuted, marginTop: 2, textTransform: 'none' },
   allocPct: { ...AITypography.bodySmall, color: AIColors.text },
+  beginnerExplainBox: {
+    backgroundColor: AIColors.primary + '14',
+    borderRadius: AIRadius.md,
+    borderLeftWidth: 3,
+    borderLeftColor: AIColors.primary,
+    padding: AISpacing.sm,
+    marginTop: AISpacing.sm,
+  },
+  beginnerExplainText: {
+    ...AITypography.bodySmall,
+    color: AIColors.textSecondary,
+  },
+  liveNavBox: {
+    backgroundColor: AIColors.backgroundSecondary,
+    borderRadius: AIRadius.md,
+    borderWidth: 1,
+    borderColor: AIColors.border,
+    padding: AISpacing.sm,
+    marginTop: AISpacing.sm,
+  },
+  liveNavTitle: { ...AITypography.label, color: AIColors.textSecondary, marginBottom: 8 },
+  liveNavRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 8 },
+  liveNavName: { ...AITypography.bodySmall, color: AIColors.text },
+  liveNavMeta: { ...AITypography.labelSmall, color: AIColors.textMuted, marginTop: 2 },
+  liveNavValue: { ...AITypography.bodySmall, color: AIColors.primary },
   metaRow: { marginBottom: AISpacing.sm },
   metaText: { ...AITypography.bodySmall, color: AIColors.textMuted },
   cta: {
@@ -275,6 +709,46 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   ctaText: { ...AITypography.buttonSmall, color: AIColors.background },
+  compareSection: {
+    marginBottom: AISpacing.md,
+  },
+  compareTitle: {
+    ...AITypography.label,
+    color: AIColors.textSecondary,
+    marginBottom: AISpacing.sm,
+  },
+  compareCard: {
+    backgroundColor: AIColors.surface,
+    borderWidth: 1,
+    borderColor: AIColors.border,
+    borderRadius: AIRadius.lg,
+    padding: AISpacing.sm,
+    marginBottom: AISpacing.sm,
+  },
+  compareTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  compareName: { ...AITypography.h3, color: AIColors.text },
+  compareType: { ...AITypography.labelSmall, color: AIColors.textMuted },
+  compareDesc: { ...AITypography.bodySmall, color: AIColors.textSecondary, marginTop: 4 },
+  compareMeta: { ...AITypography.bodySmall, color: AIColors.textMuted, marginTop: 4 },
+  glossaryToggle: {
+    borderWidth: 1,
+    borderColor: AIColors.border,
+    borderRadius: AIRadius.md,
+    backgroundColor: AIColors.surface,
+    paddingVertical: 10,
+    alignItems: 'center',
+    marginBottom: AISpacing.sm,
+  },
+  glossaryToggleText: { ...AITypography.bodySmall, color: AIColors.textSecondary },
+  glossaryBox: {
+    backgroundColor: AIColors.backgroundSecondary,
+    borderWidth: 1,
+    borderColor: AIColors.border,
+    borderRadius: AIRadius.md,
+    padding: AISpacing.sm,
+    marginBottom: AISpacing.md,
+  },
+  glossaryLine: { ...AITypography.bodySmall, color: AIColors.textSecondary, marginBottom: 6 },
   notice: {
     backgroundColor: AIColors.warningDim,
     borderRadius: AIRadius.lg,

@@ -100,6 +100,7 @@ export interface InvestmentPortfolio {
   platform_urls: string[];
   explanation: string;
   min_monthly_sip: number;
+  nav_highlights?: FundNavSnapshot[];
 }
 
 export interface InvestmentRecommendationsResponse {
@@ -107,6 +108,16 @@ export interface InvestmentRecommendationsResponse {
   recommended_monthly_investment: number;
   primary_recommendation: string;
   reasoning: string;
+  as_of?: string;
+}
+
+export interface FundNavSnapshot {
+  scheme_code: string;
+  scheme_name: string;
+  isin: string;
+  nav: number;
+  nav_date: string;
+  fetched_at: string;
 }
 
 export interface BenefitEstimateResponse {

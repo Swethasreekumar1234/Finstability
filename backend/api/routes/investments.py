@@ -1,6 +1,8 @@
 from __future__ import annotations
+from datetime import datetime, timezone
 from fastapi import APIRouter
 from database.models import UserProfile, InvestmentPortfolio, InvestmentRecommendationsResponse
+from database.fund_nav import get_portfolio_nav_highlights
 
 router = APIRouter()
 
@@ -21,6 +23,7 @@ _PORTFOLIOS = [
         ],
         explanation="FDs + gold + large-cap index funds balance safety with moderate real returns. Good for ages 50+ or high debt situations.",
         min_monthly_sip=500.0,
+        nav_highlights=[],
     ),
     InvestmentPortfolio(
         name="Balanced",
@@ -38,6 +41,7 @@ _PORTFOLIOS = [
         ],
         explanation="Blended allocation gives market-linked growth while debt and gold cushion volatility. Good for most working adults.",
         min_monthly_sip=1000.0,
+        nav_highlights=[],
     ),
     InvestmentPortfolio(
         name="Growth",
@@ -55,8 +59,16 @@ _PORTFOLIOS = [
         ],
         explanation="High equity in diversified funds can generate superior compounding over 10+ years. Best for ages 18–35 with low debt.",
         min_monthly_sip=2000.0,
+        nav_highlights=[],
     ),
 ]
+
+
+_PORTFOLIO_NAV_KEYWORDS = {
+    "Conservative": ["liquid", "overnight", "money market", "short duration", "corporate bond", "gilt", "debt"],
+    "Balanced": ["balanced advantage", "flexi cap", "hybrid", "index", "multi asset", "value", "debt"],
+    "Growth": ["large cap", "mid cap", "small cap", "international", "global", "thematic", "sector", "index"],
+}
 
 
 def _primary_index(profile: UserProfile) -> int:
@@ -81,9 +93,20 @@ async def recommend_investments(profile: UserProfile):
         f"the {_PORTFOLIOS[idx].name} portfolio is your best fit. "
         f"Investing ₹{monthly:,.0f}/month (15% of income) as SIP is recommended."
     )
+    portfolios = []
+    for portfolio in _PORTFOLIOS:
+        live_matches = []
+        try:
+            keywords = _PORTFOLIO_NAV_KEYWORDS.get(portfolio.name, [])
+            live_matches = await get_portfolio_nav_highlights(keywords, limit=3)
+        except Exception:
+            live_matches = []
+        portfolios.append(portfolio.model_copy(update={"nav_highlights": live_matches}))
+
     return InvestmentRecommendationsResponse(
-        portfolios=_PORTFOLIOS,
+        portfolios=portfolios,
         recommended_monthly_investment=monthly,
         primary_recommendation=_PORTFOLIOS[idx].name,
         reasoning=reasoning,
+        as_of=datetime.now(timezone.utc),
     )

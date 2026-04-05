@@ -1,5 +1,6 @@
 from __future__ import annotations
 from typing import Optional, List, Literal, Dict
+from datetime import datetime
 from pydantic import BaseModel
 
 
@@ -109,6 +110,16 @@ class InvestmentPortfolio(BaseModel):
     platform_urls: List[str]
     explanation: str
     min_monthly_sip: float
+    nav_highlights: Optional[List["FundNavSnapshot"]] = None
+
+
+class FundNavSnapshot(BaseModel):
+    scheme_code: str
+    scheme_name: str
+    isin: str
+    nav: float
+    nav_date: str
+    fetched_at: datetime
 
 
 class InvestmentRecommendationsResponse(BaseModel):
@@ -116,6 +127,22 @@ class InvestmentRecommendationsResponse(BaseModel):
     recommended_monthly_investment: float
     primary_recommendation: str
     reasoning: str
+    as_of: Optional[datetime] = None
+
+
+class FundNavDocument(BaseModel):
+    scheme_code: str
+    scheme_name: str
+    isin: str
+    nav: float
+    nav_date: str
+    fetched_at: datetime
+
+
+class FundNavHistoryResponse(BaseModel):
+    scheme_code: str
+    count: int
+    items: List[FundNavDocument]
 
 
 class TransactionIn(BaseModel):

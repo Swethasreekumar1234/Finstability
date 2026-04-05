@@ -13,18 +13,29 @@ async def lifespan(app: FastAPI):
     from database.mongodb import connect_db, close_db
     from rag.embeddings import build_index
     from database.seed_schemes import seed
+    from database.fund_nav import ensure_fund_nav_indexes, start_fund_nav_scheduler, stop_fund_nav_scheduler
 
     logger.info("Starting Finstability API…")
     
     # MongoDB is optional for dev; API works without it but profile persistence disabled
     db_connected = False
+    scheduler_started = False
     try:
         await connect_db()
         logger.info("MongoDB connected.")
-        await seed()
         db_connected = True
+        await seed()
+        await ensure_fund_nav_indexes()
+        start_fund_nav_scheduler()
+        scheduler_started = True
     except Exception as exc:
         logger.warning("MongoDB unavailable: %s — profiles will not persist", exc)
+        if scheduler_started:
+            stop_fund_nav_scheduler()
+            scheduler_started = False
+        if db_connected:
+            await close_db()
+            db_connected = False
 
     try:
         await build_index()
@@ -34,8 +45,9 @@ async def lifespan(app: FastAPI):
 
     yield
 
+    if scheduler_started:
+        stop_fund_nav_scheduler()
     if db_connected:
-        from database.mongodb import close_db
         await close_db()
     logger.info("Finstability API shut down.")
 
@@ -55,11 +67,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-from api.routes import profile, schemes, investments, transactions  # noqa: E402
+from api.routes import profile, schemes, investments, transactions, nav  # noqa: E402
 
 app.include_router(profile.router, prefix="/profile", tags=["Profile"])
 app.include_router(schemes.router, prefix="/schemes", tags=["Schemes"])
 app.include_router(investments.router, prefix="/investments", tags=["Investments"])
+app.include_router(nav.router, prefix="/nav", tags=["NAV"])
 app.include_router(transactions.router, prefix="/transactions", tags=["Transactions"])
 
 

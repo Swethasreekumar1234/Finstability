@@ -6,7 +6,7 @@
 import * as Google from 'expo-auth-session/providers/google';
 import Constants from 'expo-constants';
 import * as WebBrowser from 'expo-web-browser';
-import { makeRedirectUri } from 'expo-auth-session';
+import * as AuthSession from 'expo-auth-session';
 import { Platform } from 'react-native';
 
 // Enable browser dismissal for auth sessions
@@ -55,7 +55,7 @@ export const GOOGLE_CONFIG = {
  * Usage: const [request, response, promptAsync] = useGoogleAuth();
  */
 export const useGoogleAuth = () => {
-  const appRedirectUri = makeRedirectUri({
+  const appRedirectUri = AuthSession.makeRedirectUri({
     scheme: APP_SCHEME,
     path: REDIRECT_PATH,
   });
@@ -67,7 +67,6 @@ export const useGoogleAuth = () => {
         if (!projectNameForProxy) {
           throw new Error('Expo Go auth proxy requires expoConfig.owner and expoConfig.slug');
         }
-
         return `https://auth.expo.io/${projectNameForProxy}`;
       })()
     : appRedirectUri;
