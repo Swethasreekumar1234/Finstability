@@ -15,12 +15,11 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import * as WebBrowser from 'expo-web-browser';
-import * as Google from 'expo-auth-session/providers/google';
 import { RootStackParamList } from '../types';
 import { useAuthStore } from '../store/authStore';
 import { AIColors, AISpacing, AIRadius, AIShadows, AITypography } from '../theme/aiTheme';
 import { GridBackdrop } from '../components/ui';
-import { GOOGLE_CONFIG } from '../config/google';
+import { useGoogleAuth } from '../config/google';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -38,13 +37,7 @@ export default function LoginScreen({ navigation }: Props) {
   const logoScale = useRef(new Animated.Value(0.8)).current;
   const glowAnim = useRef(new Animated.Value(0.3)).current;
 
-  const [request, response, promptAsync] = Google.useIdTokenAuthRequest({
-    clientId: GOOGLE_CONFIG.webClientId,
-    androidClientId: GOOGLE_CONFIG.androidClientId,
-    extraParams: {
-      prompt: 'select_account',
-    },
-  });
+  const [request, response, promptAsync] = useGoogleAuth();
 
   useEffect(() => {
     // Entry animations
@@ -118,7 +111,7 @@ export default function LoginScreen({ navigation }: Props) {
 
       navigation.reset({
         index: 0,
-        routes: [{ name: result.isNewUser ? 'ProfileSetup' : 'Dashboard' }],
+        routes: [{ name: 'Dashboard' }],
       });
     } catch (error: any) {
       setLocalError(error?.message || 'Google sign-in failed');
