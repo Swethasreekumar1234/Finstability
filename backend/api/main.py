@@ -87,19 +87,14 @@ app.add_middleware(
 
 # --- ROUTER INCLUSION ---
 # These are the modular files we just fixed in the /routes/ folder
-from api.routes import profile, schemes, investments
-
-# If you have transactions.py or nav.py files, you can uncomment these lines:
-# from api.routes import transactions, nav
+from api.routes import profile, schemes, investments, transactions, nav
 
 # Connect the endpoints to the main app
 app.include_router(profile.router, prefix="/profile", tags=["Profile Management"])
 app.include_router(schemes.router, prefix="/schemes", tags=["Personalized Schemes"])
 app.include_router(investments.router, prefix="/investments", tags=["Investment Advice"])
-
-# Uncomment if these files exist in your routes folder:
-# app.include_router(nav.router, prefix="/nav", tags=["Mutual Fund NAV"])
-# app.include_router(transactions.router, prefix="/transactions", tags=["Budgeting"])
+app.include_router(nav.router, prefix="/nav", tags=["Mutual Fund NAV"])
+app.include_router(transactions.router, prefix="/transactions", tags=["Budgeting"])
 
 @app.get("/health", tags=["System"])
 async def health_check():

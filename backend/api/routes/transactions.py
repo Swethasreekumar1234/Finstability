@@ -191,7 +191,10 @@ async def add_transaction(payload: TransactionIn):
         except:
             raise HTTPException(status_code=409, detail="Duplicate transaction detected")
 
-        return {"message": "Transaction saved", "transaction": {k: v for k, v in doc.items() if k != "fingerprint"}}
+        return {
+            "message": "Transaction saved",
+            "transaction": {k: v for k, v in doc.items() if k not in {"fingerprint", "_id"}},
+        }
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
 
