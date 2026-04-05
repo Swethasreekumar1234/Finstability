@@ -14,7 +14,7 @@ const PROFILE_KEY = 'financial_profile';
 const GOALS_KEY = 'user_goals';
 
 type NavigationProp = CompositeNavigationProp<
-  BottomTabNavigationProp<TabParamList, 'Health'>,
+  BottomTabNavigationProp<TabParamList, 'Goals'>,
   NativeStackNavigationProp<RootStackParamList>
 >;
 

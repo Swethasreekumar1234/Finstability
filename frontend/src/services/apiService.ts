@@ -3,9 +3,7 @@
  * Falls back gracefully when the backend is unavailable.
  */
 
-import { getBackendBaseUrl } from '../config/backend';
-
-const API_BASE = getBackendBaseUrl();
+import { getBackendBaseUrls } from '../config/backend';
 
 // ─── Request/Response types ────────────────────────────────────────────────
 
@@ -197,49 +195,62 @@ export interface MonthlySummary {
 
 // ─── Internal fetch helper ─────────────────────────────────────────────────
 
+async function fetchFromBackend(path: string, init: RequestInit, timeoutMs: number): Promise<Response> {
+  let lastError: unknown = null;
+
+  for (const baseUrl of getBackendBaseUrls()) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+      const res = await fetch(`${baseUrl}${path}`, {
+        ...init,
+        signal: controller.signal,
+      });
+      clearTimeout(timer);
+      return res;
+    } catch (err) {
+      clearTimeout(timer);
+      lastError = err;
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error('Backend unavailable');
+}
+
 async function post<T>(path: string, body: unknown): Promise<T> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 10000); // 10 s timeout
-  try {
-    const res = await fetch(`${API_BASE}${path}`, {
+  const res = await fetchFromBackend(
+    path,
+    {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
-      signal: controller.signal,
-    });
-    clearTimeout(timer);
-    if (!res.ok) {
-      let detail = '';
-      try {
-        const payload = await res.json();
-        detail = payload?.detail ? String(payload.detail) : '';
-      } catch {
-        // Ignore parse errors and fall back to status-only message.
-      }
-      throw new Error(detail ? `API ${res.status}: ${detail}` : `API ${res.status}`);
+    },
+    10000
+  );
+
+  if (!res.ok) {
+    let detail = '';
+    try {
+      const payload = await res.json();
+      detail = payload?.detail ? String(payload.detail) : '';
+    } catch {
+      // Ignore parse errors and fall back to status-only message.
     }
-    return res.json() as Promise<T>;
-  } catch (err) {
-    clearTimeout(timer);
-    throw err;
+    throw new Error(detail ? `API ${res.status}: ${detail}` : `API ${res.status}`);
   }
+
+  return res.json() as Promise<T>;
 }
 
 async function get<T>(path: string): Promise<T> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 10000);
-  try {
-    const res = await fetch(`${API_BASE}${path}`, {
-      method: 'GET',
-      signal: controller.signal,
-    });
-    clearTimeout(timer);
-    if (!res.ok) throw new Error(`API ${res.status}`);
-    return res.json() as Promise<T>;
-  } catch (err) {
-    clearTimeout(timer);
-    throw err;
+  const res = await fetchFromBackend(path, { method: 'GET' }, 10000);
+
+  if (!res.ok) {
+    throw new Error(`API ${res.status}`);
   }
+
+  return res.json() as Promise<T>;
 }
 
 // ─── Public API ────────────────────────────────────────────────────────────
@@ -283,10 +294,7 @@ export const apiService = {
   /** Returns true if the backend server is reachable. */
   async isAvailable(): Promise<boolean> {
     try {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 3000);
-      const res = await fetch(`${API_BASE}/health`, { signal: controller.signal });
-      clearTimeout(timer);
+      const res = await fetchFromBackend('/health', { method: 'GET' }, 3000);
       return res.ok;
     } catch {
       return false;
@@ -335,20 +343,14 @@ export const apiService = {
       type: mimeType || 'application/octet-stream',
     } as any);
 
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 30000);
-
     try {
-      const res = await fetch(`${API_BASE}/transactions/upload-bank-statement`, {
+      const res = await fetchFromBackend('/transactions/upload-bank-statement', {
         method: 'POST',
         body: form,
-        signal: controller.signal,
-      });
-      clearTimeout(timer);
+      }, 30000);
       if (!res.ok) throw new Error(`API ${res.status}`);
       return res.json();
     } catch (err) {
-      clearTimeout(timer);
       throw err;
     }
   },

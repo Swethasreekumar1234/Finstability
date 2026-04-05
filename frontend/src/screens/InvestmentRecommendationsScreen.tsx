@@ -389,7 +389,7 @@ export default function InvestmentRecommendationsScreen() {
                 <>
                   <View style={styles.allocBar}>
                     {allocationRows.map(([name, pct], index) => {
-                      const width = `${(Number(pct || 0) / totalAllocation) * 100}%`;
+                      const width = `${(Number(pct || 0) / totalAllocation) * 100}%` as `${number}%`;
                       const segColor = [AIColors.primary, AIColors.secondary, AIColors.warning, '#a87ee8', AIColors.error][index % 5];
                       return <View key={`seg-${name}`} style={[styles.allocBarSeg, { width, backgroundColor: segColor }]} />;
                     })}

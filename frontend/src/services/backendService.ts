@@ -1,6 +1,27 @@
-import { getBackendBaseUrl } from '../config/backend';
+import { getBackendBaseUrls } from '../config/backend';
 
-const BACKEND_URL = getBackendBaseUrl();
+async function fetchFromBackend(path: string, init: RequestInit, timeoutMs: number): Promise<Response> {
+  let lastError: unknown = null;
+
+  for (const baseUrl of getBackendBaseUrls()) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+      const res = await fetch(`${baseUrl}${path}`, {
+        ...init,
+        signal: controller.signal,
+      });
+      clearTimeout(timer);
+      return res;
+    } catch (err) {
+      clearTimeout(timer);
+      lastError = err;
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error('Backend unavailable');
+}
 
 export interface BackendScheme {
   scheme_name: string;
@@ -22,12 +43,11 @@ export interface UserProfileForBackend {
  */
 export async function checkBackendHealth(): Promise<boolean> {
   try {
-    const res = await fetch(`${BACKEND_URL}/health`, {
+    const res = await fetchFromBackend('/health', {
       method: 'GET',
       headers: { 'Content-Type': 'application/json' },
-    });
-    const data = await res.json();
-    return data.status === 'ok' && data.index_loaded === true;
+    }, 3000);
+    return res.ok;
   } catch {
     return false;
   }
@@ -41,11 +61,11 @@ export async function getAISchemeRecommendations(
   profile: UserProfileForBackend
 ): Promise<BackendScheme[]> {
   try {
-    const res = await fetch(`${BACKEND_URL}/recommend-schemes`, {
+    const res = await fetchFromBackend('/recommend-schemes', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(profile),
-    });
+    }, 10000);
 
     if (!res.ok) {
       console.warn('Backend returned error:', res.status);

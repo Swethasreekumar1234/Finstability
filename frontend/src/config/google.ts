@@ -77,7 +77,7 @@ export const useGoogleAuth = () => {
   console.log('Redirect URI:', redirectUri);
 
   const [request, response, promptAsync] = Google.useAuthRequest({
-    expoClientId: GOOGLE_CONFIG.webClientId,
+    clientId: GOOGLE_CONFIG.webClientId,
     webClientId: GOOGLE_CONFIG.webClientId,
     androidClientId: GOOGLE_CONFIG.androidClientId,
     iosClientId: GOOGLE_CONFIG.iosClientId || GOOGLE_CONFIG.webClientId,
