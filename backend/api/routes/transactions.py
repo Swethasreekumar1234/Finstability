@@ -55,7 +55,12 @@ def _clean_amount(value) -> float:
 
 
 def _normalize_date(value) -> str:
-    ts = pd.to_datetime(value, errors="coerce", dayfirst=True)
+    raw = str(value).strip()
+    if re.fullmatch(r"\d{4}-\d{2}-\d{2}", raw):
+      datetime.strptime(raw, "%Y-%m-%d")
+      return raw
+
+    ts = pd.to_datetime(raw, errors="coerce", dayfirst=True)
     if pd.isna(ts):
         raise ValueError(f"Invalid date value: {value}")
     return ts.strftime("%Y-%m-%d")

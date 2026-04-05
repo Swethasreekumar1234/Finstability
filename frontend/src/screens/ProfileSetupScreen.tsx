@@ -83,6 +83,20 @@ const yesNoChoices = [
   { label: 'No', value: false },
 ];
 
+const genderChoices = [
+  { label: 'Female', value: 'female' },
+  { label: 'Male', value: 'male' },
+  { label: 'Other', value: 'other' },
+];
+
+function inferAgeBand(age: number): string {
+  if (age <= 24) return '18-24';
+  if (age <= 34) return '25-34';
+  if (age <= 44) return '35-44';
+  if (age <= 54) return '45-54';
+  return '55+';
+}
+
 function Chip({
   selected,
   label,
@@ -124,7 +138,9 @@ export default function ProfileSetupScreen({ navigation }: Props) {
   const [localFullName, setLocalFullName] = useState(currentUser?.displayName || fullName || '');
   const [localCity, setLocalCity] = useState('');
   const [localState, setLocalState] = useState('Delhi');
+  const [localAge, setLocalAge] = useState('30');
   const [localAgeBand, setLocalAgeBand] = useState<string>('25-34');
+  const [localGender, setLocalGender] = useState<string | null>(null);
   const [localUserType, setLocalUserType] = useState<UserType | null>(selectedUserType);
   const [localEmploymentType, setLocalEmploymentType] = useState('salaried');
   const [localHouseholdSize, setLocalHouseholdSize] = useState(1);
@@ -172,7 +188,17 @@ export default function ProfileSetupScreen({ navigation }: Props) {
   }, [step]);
 
   const canProceed = useMemo(() => {
-    if (step === 1) return localFullName.trim().length >= 2 && localState.trim().length > 0;
+    if (step === 1) {
+      const ageNum = Number(localAge);
+      return (
+        localFullName.trim().length >= 2
+        && localState.trim().length > 0
+        && Number.isFinite(ageNum)
+        && ageNum >= 18
+        && ageNum <= 100
+        && localGender !== null
+      );
+    }
     if (step === 2) return localUserType !== null && localEmploymentType.length > 0;
     if (step === 3) {
       return (
@@ -189,6 +215,8 @@ export default function ProfileSetupScreen({ navigation }: Props) {
     step,
     localFullName,
     localState,
+    localAge,
+    localGender,
     localUserType,
     localEmploymentType,
     localIncomeRange,
@@ -203,12 +231,16 @@ export default function ProfileSetupScreen({ navigation }: Props) {
   ]);
 
   const inferredAge = useMemo(() => {
+    const ageNum = Number(localAge);
+    if (Number.isFinite(ageNum) && ageNum >= 18) {
+      return ageNum;
+    }
     if (localAgeBand === '18-24') return 22;
     if (localAgeBand === '25-34') return 30;
     if (localAgeBand === '35-44') return 39;
     if (localAgeBand === '45-54') return 49;
     return 58;
-  }, [localAgeBand]);
+  }, [localAge, localAgeBand]);
 
   const toggleGoal = (goal: FinancialGoal) => {
     setLocalGoals((prev) =>
@@ -242,7 +274,9 @@ export default function ProfileSetupScreen({ navigation }: Props) {
       city: localCity.trim(),
       state: localState.trim(),
       age: inferredAge,
-      ageBand: localAgeBand,
+      ageConfirmed: true,
+      ageBand: inferAgeBand(inferredAge),
+      gender: localGender || 'other',
       employmentType: localEmploymentType,
       occupation: localEmploymentType,
       householdSize: localHouseholdSize,
@@ -300,6 +334,28 @@ export default function ProfileSetupScreen({ navigation }: Props) {
             placeholderTextColor={AIColors.textMuted}
             autoCapitalize="words"
           />
+
+          <Text style={styles.fieldLabel}>Age band</Text>
+          <TextInput
+            style={styles.input}
+            value={localAge}
+            onChangeText={setLocalAge}
+            keyboardType="numeric"
+            placeholder="Age (18+)"
+            placeholderTextColor={AIColors.textMuted}
+          />
+
+          <Text style={styles.fieldLabel}>Gender</Text>
+          <View style={styles.chipWrap}>
+            {genderChoices.map((item) => (
+              <Chip
+                key={item.value}
+                label={item.label}
+                selected={localGender === item.value}
+                onPress={() => setLocalGender(item.value)}
+              />
+            ))}
+          </View>
 
           <Text style={styles.fieldLabel}>Age band</Text>
           <View style={styles.chipWrap}>

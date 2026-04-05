@@ -20,6 +20,7 @@ function today(): string {
 
 export default function AddTransactionScreen({ navigation }: Props) {
   const firebaseUid = useAuthStore((s) => s.firebaseUid);
+  const currentUser = useAuthStore((s) => s.currentUser);
   const [date, setDate] = useState(today());
   const [amount, setAmount] = useState('');
   const [merchant, setMerchant] = useState('');
@@ -33,20 +34,32 @@ export default function AddTransactionScreen({ navigation }: Props) {
       return;
     }
 
+    const parsedAmount = parseFloat(amount);
+    if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+      Alert.alert('Invalid amount', 'Please enter an amount greater than 0.');
+      return;
+    }
+
     setLoading(true);
     try {
       await apiService.addTransaction({
-        user_id: firebaseUid || 'demo-user',
+        user_id: firebaseUid || currentUser?.email || 'demo-user',
         date,
-        amount: parseFloat(amount),
+        amount: parsedAmount,
         type,
         merchant: merchant.trim(),
         category,
       });
       Alert.alert('Saved', 'Transaction added successfully.');
       navigation.goBack();
-    } catch {
-      Alert.alert('Failed', 'Unable to save transaction. Please try again.');
+    } catch (error: any) {
+      const message = String(error?.message || 'Unable to save transaction. Please try again.');
+      if (message.toLowerCase().includes('duplicate transaction detected')) {
+        Alert.alert('Already saved', 'This transaction already exists.');
+        navigation.goBack();
+        return;
+      }
+      Alert.alert('Failed', message);
     } finally {
       setLoading(false);
     }

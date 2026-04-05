@@ -15,18 +15,20 @@ def check_eligibility(
     fails: List[str] = []
 
     # --- Age ---
-    if scheme.min_age is not None and profile.age < scheme.min_age:
-        fails.append(f"Minimum age is {scheme.min_age} (yours: {profile.age})")
-    if scheme.max_age is not None and profile.age > scheme.max_age:
-        fails.append(f"Maximum age is {scheme.max_age} (yours: {profile.age})")
-    if fails:
-        return False, 0.0, "; ".join(fails)
+    if profile.age is not None:
+        if scheme.min_age is not None and profile.age < scheme.min_age:
+            fails.append(f"Minimum age is {scheme.min_age} (yours: {profile.age})")
+        if scheme.max_age is not None and profile.age > scheme.max_age:
+            fails.append(f"Maximum age is {scheme.max_age} (yours: {profile.age})")
+        if fails:
+            return False, 0.0, "; ".join(fails)
 
-    # Age band description
-    if scheme.min_age and scheme.max_age:
-        reasons.append(f"Age {profile.age} is in the {scheme.min_age}–{scheme.max_age} eligible range")
-    elif scheme.min_age:
-        reasons.append(f"Age {profile.age} meets minimum age {scheme.min_age}")
+        if scheme.min_age and scheme.max_age:
+            reasons.append(f"Age {profile.age} is in the {scheme.min_age}–{scheme.max_age} eligible range")
+        elif scheme.min_age:
+            reasons.append(f"Age {profile.age} meets minimum age {scheme.min_age}")
+    else:
+        reasons.append("Age not confirmed yet")
 
     # --- Income ---
     if scheme.income_limit is not None:
@@ -45,7 +47,7 @@ def check_eligibility(
         return False, 0.0, "; ".join(fails)
 
     # --- Gender ---
-    if scheme.gender and scheme.gender != "all":
+    if scheme.gender and scheme.gender != "all" and profile.gender:
         if profile.gender.lower() != scheme.gender.lower():
             fails.append(f"Scheme is for {scheme.gender} applicants only")
     if fails:

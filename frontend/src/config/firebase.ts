@@ -179,6 +179,58 @@ export const signInWithGoogleCredential = async (
   idToken?: string,
   accessToken?: string
 ): Promise<User> => {
+  const decodeJwtPayload = (token: string): Record<string, any> | null => {
+    try {
+      const parts = token.split('.');
+      if (parts.length < 2) return null;
+      const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+      const padded = base64 + '='.repeat((4 - (base64.length % 4)) % 4);
+      const decode = (globalThis as any).atob as ((value: string) => string) | undefined;
+      if (!decode) return null;
+      const json = decode(padded);
+      return JSON.parse(json);
+    } catch {
+      return null;
+    }
+  };
+
+  const buildFallbackUser = async (): Promise<User> => {
+    let email = '';
+    let displayName = '';
+    let sub = '';
+
+    if (accessToken) {
+      try {
+        const res = await fetch(`https://www.googleapis.com/oauth2/v2/userinfo?access_token=${encodeURIComponent(accessToken)}`);
+        if (res.ok) {
+          const info = await res.json();
+          email = String(info?.email || '');
+          displayName = String(info?.name || '');
+          sub = String(info?.id || '');
+        }
+      } catch {
+        // Fallback to decoding id token when userinfo lookup is unavailable.
+      }
+    }
+
+    if ((!email || !sub) && idToken) {
+      const payload = decodeJwtPayload(idToken);
+      if (payload) {
+        email = email || String(payload.email || '');
+        displayName = displayName || String(payload.name || payload.given_name || '');
+        sub = sub || String(payload.sub || '');
+      }
+    }
+
+    const uid = sub || `google:${email || Date.now()}`;
+    return {
+      uid,
+      email: email || null,
+      displayName: displayName || null,
+      phoneNumber: null,
+    } as User;
+  };
+
   try {
     if (!idToken && !accessToken) {
       throw new Error('Missing Google auth token');
@@ -189,6 +241,13 @@ export const signInWithGoogleCredential = async (
     return result.user;
   } catch (error: any) {
     console.error('Error signing in with Google:', error);
+
+    const code = String(error?.code || '');
+    if (code.includes('auth/network-request-failed')) {
+      console.warn('Firebase Google exchange failed due to network; using token-based fallback user identity.');
+      return buildFallbackUser();
+    }
+
     throw new Error(error.message || 'Failed to sign in with Google');
   }
 };

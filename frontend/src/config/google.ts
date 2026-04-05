@@ -48,6 +48,9 @@ export const GOOGLE_CONFIG = {
   webClientId: '793985902050-fh14tv9v63afmojstglvmh7a4sfr2vti.apps.googleusercontent.com',
   // Android Client ID (from google-services.json)
   androidClientId: '793985902050-hm0bu890qe1f2hi5dbvfr9re7lp7pq0e.apps.googleusercontent.com',
+  // iOS client ID is required by expo-auth-session on iOS.
+  // Use dedicated iOS client ID when available; fallback keeps Expo Go flow unblocked.
+  iosClientId: '793985902050-fh14tv9v63afmojstglvmh7a4sfr2vti.apps.googleusercontent.com',
 };
 
 /**
@@ -74,8 +77,10 @@ export const useGoogleAuth = () => {
   console.log('Redirect URI:', redirectUri);
 
   const [request, response, promptAsync] = Google.useAuthRequest({
-    clientId: GOOGLE_CONFIG.webClientId,
+    expoClientId: GOOGLE_CONFIG.webClientId,
+    webClientId: GOOGLE_CONFIG.webClientId,
     androidClientId: GOOGLE_CONFIG.androidClientId,
+    iosClientId: GOOGLE_CONFIG.iosClientId || GOOGLE_CONFIG.webClientId,
     redirectUri,
     responseType: 'token',
     scopes: ['openid', 'profile', 'email'],

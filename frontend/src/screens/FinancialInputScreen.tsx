@@ -15,6 +15,7 @@ import {
   View,
 } from 'react-native';
 import Slider from '@react-native-community/slider';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
@@ -29,9 +30,10 @@ import {
   RootStackParamList,
 } from '../types';
 import { AIColors, AIRadius, AISpacing, AIShadows, AITypography } from '../theme/aiTheme';
-import { apiService } from '../services/apiService';
+import { apiService, BackendProfile } from '../services/apiService';
 import { useAuthStore } from '../store/authStore';
 import { GridBackdrop, ScreenHeader } from '../components/ui';
+import { nextProfilePrompt, applyPromptAnswerToPayload } from '../utils/profilePrompts';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'FinancialInput'>;
@@ -58,7 +60,7 @@ const RISK_OPTIONS = [RiskTolerance.LOW, RiskTolerance.MODERATE, RiskTolerance.H
 const GOAL_OPTIONS = Object.values(FinancialGoal);
 
 export default function FinancialInputScreen({ navigation, route }: Props) {
-  const { currentUser, firebaseUid } = useAuthStore();
+  const { currentUser, firebaseUid, loadUserProfile } = useAuthStore();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -71,16 +73,19 @@ export default function FinancialInputScreen({ navigation, route }: Props) {
   const [riskTolerance, setRiskTolerance] = useState<RiskTolerance>(RiskTolerance.MODERATE);
   const [investmentExperience, setInvestmentExperience] = useState(4);
   const [goals, setGoals] = useState<FinancialGoal[]>([]);
+  const [profileDoc, setProfileDoc] = useState<BackendProfile | null>(null);
+  const [savingPrompt, setSavingPrompt] = useState(false);
 
   useEffect(() => {
     const loadProfile = async () => {
       try {
-        const profile = currentUser?.email
+        const profileByUserId = firebaseUid ? await apiService.getProfileByUserId(firebaseUid) : null;
+        const profileByEmail = !profileByUserId && currentUser?.email
           ? await apiService.getProfileByEmail(currentUser.email)
-          : firebaseUid
-            ? await apiService.getProfileByUserId(firebaseUid)
-            : null;
+          : null;
+        const profile = profileByUserId || profileByEmail;
         if (profile) {
+          setProfileDoc(profile);
           setMonthlyIncome(String(profile.monthly_income ?? 0));
           setMonthlyExpenses(String(profile.monthly_expenses ?? 0));
           setTotalSavings(String(profile.total_savings ?? 0));
@@ -112,6 +117,46 @@ export default function FinancialInputScreen({ navigation, route }: Props) {
     setGoals((prev) => (prev.includes(g) ? prev.filter((x) => x !== g) : [...prev, g]));
   };
 
+  const profilePrompt = useMemo(() => nextProfilePrompt(profileDoc), [profileDoc]);
+
+  const handleProfilePromptAnswer = async (value: string | boolean | number) => {
+    if (!profileDoc || !profilePrompt || savingPrompt) return;
+
+    const resolvedEmail = String(profileDoc.email || currentUser?.email || '').trim().toLowerCase();
+    const resolvedUserId = String(profileDoc.user_id || profileDoc.firebase_uid || firebaseUid || `email:${resolvedEmail}`);
+
+    const payload: BackendProfile = {
+      ...profileDoc,
+      user_id: resolvedUserId,
+      firebase_uid: resolvedUserId,
+      email: resolvedEmail,
+      name: profileDoc.name || profileDoc.display_name || profileDoc.full_name || 'User',
+      full_name: profileDoc.full_name || profileDoc.display_name || profileDoc.name || 'User',
+      display_name: profileDoc.display_name || profileDoc.full_name || profileDoc.name || 'User',
+      state: String(profileDoc.state ?? 'Delhi'),
+      occupation: String(profileDoc.occupation ?? profileDoc.employment_type ?? 'salaried'),
+      employment_type: String(profileDoc.employment_type ?? 'salaried'),
+      monthly_income: Number(profileDoc.monthly_income ?? 0),
+      monthly_expenses: Number(profileDoc.monthly_expenses ?? 0),
+      total_savings: Number(profileDoc.total_savings ?? 0),
+      total_debts: Number(profileDoc.total_debts ?? profileDoc.existing_loans ?? 0),
+      family_size: Number(profileDoc.family_size ?? profileDoc.household_size ?? 1),
+    };
+
+    applyPromptAnswerToPayload(payload, profilePrompt, value);
+
+    setSavingPrompt(true);
+    try {
+      await apiService.saveProfile(payload);
+      const refreshed = await apiService.getProfileByUserId(resolvedUserId)
+        || (resolvedEmail ? await apiService.getProfileByEmail(resolvedEmail) : null);
+      setProfileDoc((refreshed || payload) as BackendProfile);
+      await loadUserProfile();
+    } finally {
+      setSavingPrompt(false);
+    }
+  };
+
   const save = async () => {
     if (Number(monthlyIncome) <= 0) {
       Alert.alert('Missing income', 'Please enter a valid monthly income.');
@@ -132,40 +177,105 @@ export default function FinancialInputScreen({ navigation, route }: Props) {
         updatedAt: new Date().toISOString(),
       };
 
+      await AsyncStorage.setItem('financial_profile', JSON.stringify(profile));
+
       // Sync full financial profile to backend MongoDB using the same user document.
       try {
-        const uid = firebaseUid || `mongo-${Date.now()}`;
+        const normalizedEmail = (currentUser?.email || '').trim().toLowerCase();
+        const uid = (firebaseUid && firebaseUid.trim())
+          ? firebaseUid
+          : normalizedEmail
+            ? `email:${normalizedEmail}`
+            : `guest:${Date.now()}`;
         const displayName = currentUser?.displayName || currentUser?.fullName || '';
+        const existingProfile = await apiService.getProfileByUserId(uid)
+          || (normalizedEmail ? await apiService.getProfileByEmail(normalizedEmail) : null);
 
-        await apiService.saveProfile({
+        const mergedProfilePayload = {
           user_id: uid,
           firebase_uid: uid,
-          name: displayName,
-          full_name: currentUser?.fullName || displayName,
-          display_name: displayName,
-          email: currentUser?.email || '',
-          phone_number: currentUser?.phoneNumber || '',
-          user_type: currentUser?.userType || '',
+          name: displayName || existingProfile?.name || existingProfile?.full_name || 'User',
+          full_name: currentUser?.fullName || existingProfile?.full_name || displayName || 'User',
+          display_name: displayName || existingProfile?.display_name || existingProfile?.full_name || 'User',
+          email: currentUser?.email || existingProfile?.email || '',
+          phone_number: currentUser?.phoneNumber || existingProfile?.phone_number || '',
+          user_type: currentUser?.userType || existingProfile?.user_type || '',
           risk_tolerance: riskTolerance,
           employment_type: employmentType.toLowerCase(),
           monthly_income: Number(monthlyIncome) || 0,
           monthly_expenses: Number(monthlyExpenses) || 0,
           total_savings: Number(totalSavings) || 0,
-          total_debts: Number(existingLoans) || 0,
-          existing_loans: Number(existingLoans) || 0,
+          total_debts: Number(existingLoans) || Number(existingProfile?.total_debts ?? existingProfile?.existing_loans ?? 0),
+          existing_loans: Number(existingLoans) || Number(existingProfile?.existing_loans ?? existingProfile?.total_debts ?? 0),
           financial_goals: goals,
           investment_experience: investmentExperience,
           updated_at_client: new Date().toISOString(),
-          family_size: 1,
-          age: 25,
-          gender: 'other',
-          state: 'Delhi',
-          occupation: 'salaried',
-        });
+          family_size: Number(existingProfile?.family_size ?? existingProfile?.household_size ?? 1),
+          age: existingProfile?.age,
+          age_confirmed: existingProfile?.age_confirmed ?? false,
+          gender: existingProfile?.gender,
+          state: existingProfile?.state || 'Delhi',
+          city: existingProfile?.city,
+          occupation: existingProfile?.occupation || 'salaried',
+          household_size: Number(existingProfile?.household_size ?? existingProfile?.family_size ?? 1),
+          housing_status: existingProfile?.housing_status,
+          income_range: existingProfile?.income_range,
+          income_regular: existingProfile?.income_regular,
+          earning_members: existingProfile?.earning_members,
+          has_bank_account: existingProfile?.has_bank_account,
+          has_land: existingProfile?.has_land,
+          has_life_insurance: existingProfile?.has_life_insurance,
+          has_health_insurance: existingProfile?.has_health_insurance,
+          has_ppf: existingProfile?.has_ppf,
+          has_fd: existingProfile?.has_fd,
+          has_mutual_funds: existingProfile?.has_mutual_funds,
+          has_gold_investments: existingProfile?.has_gold_investments,
+          caste_category: existingProfile?.caste_category,
+          marital_status: existingProfile?.marital_status,
+          minority_status: existingProfile?.minority_status,
+          disability_status: existingProfile?.disability_status,
+          disability_percentage: existingProfile?.disability_percentage,
+          district: existingProfile?.district,
+          urban_rural: existingProfile?.urban_rural,
+          domicile_years: existingProfile?.domicile_years,
+          aspirational_district: existingProfile?.aspirational_district,
+          special_region_flag: existingProfile?.special_region_flag,
+          dependent_children: existingProfile?.dependent_children,
+          senior_citizens_in_household: existingProfile?.senior_citizens_in_household,
+          single_woman_led_household: existingProfile?.single_woman_led_household,
+          occupation_subtype: existingProfile?.occupation_subtype,
+          sector: existingProfile?.sector,
+          employment_proof_available: existingProfile?.employment_proof_available,
+          education_level: existingProfile?.education_level,
+          student_status: existingProfile?.student_status,
+          institution_type: existingProfile?.institution_type,
+          course_stream: existingProfile?.course_stream,
+          jan_dhan_account: existingProfile?.jan_dhan_account,
+          has_aadhaar: existingProfile?.has_aadhaar,
+          has_pan: existingProfile?.has_pan,
+          landholding_acres: existingProfile?.landholding_acres,
+          irrigation_status: existingProfile?.irrigation_status,
+          housing_ownership_type: existingProfile?.housing_ownership_type,
+          pmay_eligible: existingProfile?.pmay_eligible,
+          enrolled_pmjjby: existingProfile?.enrolled_pmjjby,
+          enrolled_pmsby: existingProfile?.enrolled_pmsby,
+          enrolled_apy: existingProfile?.enrolled_apy,
+          enrolled_esic: existingProfile?.enrolled_esic,
+          enrolled_epfo: existingProfile?.enrolled_epfo,
+          application_history_status: existingProfile?.application_history_status,
+          benefit_cap_reached: existingProfile?.benefit_cap_reached,
+          has_ration_card: existingProfile?.has_ration_card,
+          has_caste_certificate: existingProfile?.has_caste_certificate,
+          has_disability_certificate: existingProfile?.has_disability_certificate,
+          has_income_certificate: existingProfile?.has_income_certificate,
+          has_domicile_certificate: existingProfile?.has_domicile_certificate,
+          has_bank_passbook: existingProfile?.has_bank_passbook,
+        };
+
+        await apiService.saveProfile(mergedProfilePayload as any);
+        await loadUserProfile();
       } catch (mongoError: any) {
         console.warn('Mongo financial profile sync skipped:', mongoError);
-        Alert.alert('Save failed', mongoError?.message || 'Could not save profile to MongoDB.');
-        return;
       }
 
       // Redirect immediately after save so the flow continues without extra taps.
@@ -174,7 +284,7 @@ export default function FinancialInputScreen({ navigation, route }: Props) {
       } else {
         navigation.goBack();
       }
-      } catch {
+    } catch {
       Alert.alert('Save failed', 'Could not save profile. Please try again.');
     } finally {
       setSaving(false);
@@ -292,6 +402,31 @@ export default function FinancialInputScreen({ navigation, route }: Props) {
               <Text style={styles.helper}>Higher values indicate more comfort with volatility and complex products.</Text>
             </View>
           )}
+
+          <View style={styles.card}>
+            <Text style={styles.sectionTitle}>Scheme Identification Questions</Text>
+            {profilePrompt ? (
+              <>
+                <Text style={styles.inputLabel}>{profilePrompt.title}</Text>
+                <Text style={styles.helper}>{profilePrompt.subtitle}</Text>
+                <View style={styles.wrap}>
+                  {profilePrompt.options.map((option) => (
+                    <TouchableOpacity
+                      key={`${profilePrompt.key}-${String(option.value)}`}
+                      style={styles.chip}
+                      onPress={() => void handleProfilePromptAnswer(option.value)}
+                      disabled={savingPrompt}
+                    >
+                      <Text style={styles.chipText}>{option.label}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                {savingPrompt ? <Text style={styles.helper}>Saving answer...</Text> : null}
+              </>
+            ) : (
+              <Text style={styles.helper}>All additional eligibility questions are completed.</Text>
+            )}
+          </View>
 
           <View style={styles.navRow}>
             <TouchableOpacity

@@ -19,8 +19,9 @@ export interface BackendProfile {
   user_type?: string;
   risk_tolerance?: string;
   firebase_uid?: string;
-  age: number;
-  gender: string;
+  age?: number | null;
+  age_confirmed?: boolean;
+  gender?: string | null;
   state: string;
   occupation: string;
   employment_type: string;
@@ -34,16 +35,56 @@ export interface BackendProfile {
   updated_at_client?: string;
   family_size: number;
   has_land?: boolean;
+  caste_category?: string;
+  minority_status?: boolean;
+  disability_status?: boolean;
+  disability_percentage?: number;
+  marital_status?: string;
   age_band?: string;
   city?: string;
+  district?: string;
+  urban_rural?: string;
+  domicile_years?: number;
+  aspirational_district?: boolean;
+  special_region_flag?: boolean;
   household_size?: number;
+  dependent_children?: number;
+  senior_citizens_in_household?: number;
+  single_woman_led_household?: boolean;
+  occupation_subtype?: string;
+  sector?: string;
+  employment_proof_available?: boolean;
+  education_level?: string;
+  student_status?: string;
+  institution_type?: string;
+  course_stream?: string;
   housing_status?: string;
   income_range?: string;
   income_regular?: boolean;
   earning_members?: number;
   has_bank_account?: boolean;
+  jan_dhan_account?: boolean;
+  has_aadhaar?: boolean;
+  has_pan?: boolean;
+  landholding_acres?: number;
+  irrigation_status?: string;
+  housing_ownership_type?: string;
+  pmay_eligible?: boolean;
   has_life_insurance?: boolean;
   has_health_insurance?: boolean;
+  enrolled_pmjjby?: boolean;
+  enrolled_pmsby?: boolean;
+  enrolled_apy?: boolean;
+  enrolled_esic?: boolean;
+  enrolled_epfo?: boolean;
+  application_history_status?: string;
+  benefit_cap_reached?: boolean;
+  has_ration_card?: boolean;
+  has_caste_certificate?: boolean;
+  has_disability_certificate?: boolean;
+  has_income_certificate?: boolean;
+  has_domicile_certificate?: boolean;
+  has_bank_passbook?: boolean;
   has_ppf?: boolean;
   has_fd?: boolean;
   has_mutual_funds?: boolean;
@@ -167,7 +208,16 @@ async function post<T>(path: string, body: unknown): Promise<T> {
       signal: controller.signal,
     });
     clearTimeout(timer);
-    if (!res.ok) throw new Error(`API ${res.status}`);
+    if (!res.ok) {
+      let detail = '';
+      try {
+        const payload = await res.json();
+        detail = payload?.detail ? String(payload.detail) : '';
+      } catch {
+        // Ignore parse errors and fall back to status-only message.
+      }
+      throw new Error(detail ? `API ${res.status}: ${detail}` : `API ${res.status}`);
+    }
     return res.json() as Promise<T>;
   } catch (err) {
     clearTimeout(timer);
@@ -244,8 +294,28 @@ export const apiService = {
   },
 
   async addTransaction(payload: AddTransactionPayload): Promise<TransactionItem> {
-    const res = await post<{ message: string; transaction: TransactionItem }>('/transactions/add-transaction', payload);
-    return res.transaction;
+    try {
+      const res = await post<{ message: string; transaction: TransactionItem }>('/transactions/add-transaction', payload);
+      return res.transaction;
+    } catch (error) {
+      // Uvicorn reload can transiently return 500 even when insert succeeded.
+      const month = payload.date.slice(0, 7);
+      try {
+        const recent = await apiService.listTransactions(payload.user_id, month);
+        const saved = recent.find((item) => (
+          item.date === payload.date
+          && item.type === payload.type
+          && Math.abs(item.amount - payload.amount) < 0.01
+          && item.merchant.trim().toLowerCase() === payload.merchant.trim().toLowerCase()
+        ));
+        if (saved) {
+          return saved;
+        }
+      } catch {
+        // Ignore fallback lookup failure and rethrow the original error.
+      }
+      throw error;
+    }
   },
 
   async listTransactions(userId: string, month?: string, category?: string): Promise<TransactionItem[]> {

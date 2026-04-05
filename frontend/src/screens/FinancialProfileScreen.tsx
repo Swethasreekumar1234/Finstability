@@ -4,6 +4,7 @@
 
 import React, { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -19,6 +20,8 @@ import { useAuthStore } from '../store/authStore';
 import { AIColors, AIRadius, AISpacing, AIShadows, AITypography } from '../theme/aiTheme';
 import { GridBackdrop, ScreenHeader } from '../components/ui';
 import { apiService } from '../services/apiService';
+
+const PROFILE_KEY = 'financial_profile';
 
 type StackNav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -59,30 +62,35 @@ export default function FinancialProfileScreen() {
     useCallback(() => {
       let active = true;
       const loadProfile = async () => {
-        const data = user?.email
+        const dataByUserId = firebaseUid ? await apiService.getProfileByUserId(firebaseUid) : null;
+        const dataByEmail = !dataByUserId && user?.email
           ? await apiService.getProfileByEmail(user.email)
-          : firebaseUid
-            ? await apiService.getProfileByUserId(firebaseUid)
-            : null;
+          : null;
+        const data = dataByUserId || dataByEmail;
+        const rawLocalProfile = await AsyncStorage.getItem(PROFILE_KEY);
+        const localProfile: FinancialProfile | null = rawLocalProfile ? JSON.parse(rawLocalProfile) : null;
         if (!active) return;
 
-        if (data) {
+        const source = data || localProfile;
+        if (source) {
           setProfile({
-            monthlyIncome: Number(data.monthly_income ?? 0),
-            monthlyExpenses: Number(data.monthly_expenses ?? 0),
-            totalSavings: Number(data.total_savings ?? 0),
-            existingLoans: Number(data.existing_loans ?? data.total_debts ?? 0),
-            employmentType: (String(data.employment_type ?? 'FULL_TIME').toUpperCase() as FinancialProfile['employmentType']),
-            riskTolerance: (String(data.risk_tolerance ?? 'MODERATE').toUpperCase() as FinancialProfile['riskTolerance']),
-            investmentExperience: Number(data.investment_experience ?? 0),
-            financialGoals: Array.isArray(data.financial_goals) ? (data.financial_goals as FinancialProfile['financialGoals']) : [],
-            updatedAt: String(data.updated_at_client ?? data.updated_at ?? new Date().toISOString()),
+            monthlyIncome: Number((data as any)?.monthly_income ?? localProfile?.monthlyIncome ?? 0),
+            monthlyExpenses: Number((data as any)?.monthly_expenses ?? localProfile?.monthlyExpenses ?? 0),
+            totalSavings: Number((data as any)?.total_savings ?? localProfile?.totalSavings ?? 0),
+            existingLoans: Number((data as any)?.existing_loans ?? (data as any)?.total_debts ?? localProfile?.existingLoans ?? 0),
+            employmentType: (String((data as any)?.employment_type ?? localProfile?.employmentType ?? 'FULL_TIME').toUpperCase() as FinancialProfile['employmentType']),
+            riskTolerance: (String((data as any)?.risk_tolerance ?? localProfile?.riskTolerance ?? 'MODERATE').toUpperCase() as FinancialProfile['riskTolerance']),
+            investmentExperience: Number((data as any)?.investment_experience ?? localProfile?.investmentExperience ?? 0),
+            financialGoals: Array.isArray((data as any)?.financial_goals)
+              ? ((data as any).financial_goals as FinancialProfile['financialGoals'])
+              : (localProfile?.financialGoals || []),
+            updatedAt: String((data as any)?.updated_at_client ?? (data as any)?.updated_at ?? localProfile?.updatedAt ?? new Date().toISOString()),
           });
-          setProfileCompleteness(Number(data.profile_completeness ?? 0));
-          setProfileLayer(String(data.profile_layer ?? 'Identity & life stage'));
-          setMissingFields(Array.isArray(data.missing_fields) ? data.missing_fields : []);
-          setUnlockedCapabilities(Array.isArray(data.unlocked_capabilities) ? data.unlocked_capabilities : []);
-          setNextPrompt(data.next_prompt ?? null);
+          setProfileCompleteness(Number((data as any)?.profile_completeness ?? 0));
+          setProfileLayer(String((data as any)?.profile_layer ?? (localProfile ? 'Local profile saved' : 'Identity & life stage')));
+          setMissingFields(Array.isArray((data as any)?.missing_fields) ? (data as any).missing_fields : []);
+          setUnlockedCapabilities(Array.isArray((data as any)?.unlocked_capabilities) ? (data as any).unlocked_capabilities : []);
+          setNextPrompt((data as any)?.next_prompt ?? null);
         } else {
           setProfile(null);
           setProfileCompleteness(0);
@@ -106,6 +114,13 @@ export default function FinancialProfileScreen() {
     if (!profile) return 0;
     return profile.monthlyIncome - profile.monthlyExpenses;
   }, [profile]);
+
+  const roleBadge = useMemo(() => {
+    if (profile?.employmentType) {
+      return EmploymentTypeLabels[profile.employmentType];
+    }
+    return user?.userType ? UserTypeLabels[user.userType] : 'Financial User';
+  }, [profile?.employmentType, user?.userType]);
 
   if (loading) {
     return (
@@ -149,7 +164,7 @@ export default function FinancialProfileScreen() {
             <Text style={styles.name}>{user?.displayName || user?.fullName || 'User'}</Text>
             <Text style={styles.phone}>{user?.phoneNumber || ''}</Text>
             <View style={styles.badge}>
-              <Text style={styles.badgeText}>{user?.userType ? UserTypeLabels[user.userType] : 'Financial User'}</Text>
+              <Text style={styles.badgeText}>{roleBadge}</Text>
             </View>
           </View>
         </View>

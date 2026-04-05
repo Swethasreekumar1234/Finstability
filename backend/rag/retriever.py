@@ -6,7 +6,7 @@ from rag.embeddings import search_similar
 
 def _build_query(profile: UserProfile) -> str:
     return (
-        f"I am a {profile.age}-year-old {profile.gender} "
+        f"I am a {profile.age or 'unknown'}-year-old {profile.gender or 'unknown'} "
         f"{profile.occupation} ({profile.employment_type}) from {profile.state}. "
         f"Monthly income ₹{profile.monthly_income:,.0f}, family size {profile.family_size}. "
         f"I am looking for government schemes, subsidies, insurance and financial benefits I qualify for."

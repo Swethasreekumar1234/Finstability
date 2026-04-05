@@ -233,22 +233,6 @@ export default function LoginScreen({ navigation }: Props) {
             
             <Text style={styles.appName}>FINSTABILITY</Text>
             <Text style={styles.tagline}>AI-Powered Financial Intelligence</Text>
-
-            {/* Feature Pills */}
-            <View style={styles.featureRow}>
-              <View style={styles.featurePill}>
-                <Text style={styles.featureDot}>●</Text>
-                <Text style={styles.featureText}>Smart Analytics</Text>
-              </View>
-              <View style={styles.featurePill}>
-                <Text style={styles.featureDot}>●</Text>
-                <Text style={styles.featureText}>AI Insights</Text>
-              </View>
-              <View style={styles.featurePill}>
-                <Text style={styles.featureDot}>●</Text>
-                <Text style={styles.featureText}>Secure</Text>
-              </View>
-            </View>
           </View>
 
           {/* Auth Section */}
@@ -339,33 +323,29 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
   },
-  
-  // Glow Effects
-  glowOrb: {
-    position: 'absolute',
-    borderRadius: 999,
-  },
-  glowOrbPrimary: {
-    top: -150,
-    right: -100,
-    width: 280,
-    height: 280,
-    backgroundColor: AIColors.primary,
-    opacity: 0.12,
-  },
-
   content: {
     flex: 1,
-    paddingHorizontal: AISpacing.xl,
-    justifyContent: 'space-between',
+    paddingHorizontal: AISpacing.md,
+    paddingBottom: AISpacing.md,
+  },
+  glowOrb: {
+    position: 'absolute',
+    width: 280,
+    height: 280,
+    borderRadius: 140,
+    zIndex: 0,
+  },
+  glowOrbPrimary: {
+    top: 40,
+    right: -80,
+    backgroundColor: AIColors.primary,
   },
 
   // Header
   header: {
     alignItems: 'center',
-    paddingTop: AISpacing.xxl,
-    flex: 1,
-    justifyContent: 'center',
+    paddingTop: AISpacing.lg,
+    marginBottom: AISpacing.lg,
   },
   logoContainer: {
     position: 'relative',
@@ -435,6 +415,7 @@ const styles = StyleSheet.create({
 
   // Auth Section
   authSection: {
+    marginTop: AISpacing.sm,
     paddingBottom: AISpacing.lg,
   },
   errorContainer: {
@@ -532,6 +513,7 @@ const styles = StyleSheet.create({
 
   // Footer
   footer: {
+    marginTop: 'auto',
     alignItems: 'center',
     paddingBottom: AISpacing.lg,
   },

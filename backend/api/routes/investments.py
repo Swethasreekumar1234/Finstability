@@ -88,7 +88,7 @@ async def recommend_investments(profile: UserProfile):
     idx = _primary_index(profile)
     monthly = max(500.0, profile.monthly_income * 0.15)
     reasoning = (
-        f"Based on your age ({profile.age}), income (₹{profile.monthly_income:,.0f}/month), "
+        f"Based on your age ({profile.age if profile.age is not None else 'not confirmed'}), income (₹{profile.monthly_income:,.0f}/month), "
         f"savings (₹{profile.total_savings:,.0f}), and debt (₹{profile.total_debts:,.0f}), "
         f"the {_PORTFOLIOS[idx].name} portfolio is your best fit. "
         f"Investing ₹{monthly:,.0f}/month (15% of income) as SIP is recommended."

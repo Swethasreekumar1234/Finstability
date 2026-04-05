@@ -1,11 +1,12 @@
 /**
  * Screen 1 - Finance Hub (Home Tab)
  */
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator, Animated, Linking, ScrollView,
   StyleSheet, Text, TouchableOpacity, View,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -16,6 +17,7 @@ import { ProgressBar } from '../components/ai';
 import { GridBackdrop, PriorityActionsQueue } from '../components/ui';
 import { getFinancialRecommendations } from '../services/recommendationEngine';
 import { apiService, SchemeRecommendation } from '../services/apiService';
+import { nextProfilePrompt, applyPromptAnswerToPayload } from '../utils/profilePrompts';
 
 const PROFILE_KEY = 'financial_profile';
 type StackNav = NativeStackNavigationProp<RootStackParamList>;
@@ -76,6 +78,9 @@ export default function DashboardScreen() {
   const [missingFields, setMissingFields] = useState<string[]>([]);
   const [unlockedCapabilities, setUnlockedCapabilities] = useState<string[]>([]);
   const [nextPrompt, setNextPrompt] = useState<string | null>(null);
+  const [profileDoc, setProfileDoc] = useState<any | null>(null);
+  const [promptDismissed, setPromptDismissed] = useState(false);
+  const [savingPrompt, setSavingPrompt] = useState(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
 
@@ -90,18 +95,31 @@ export default function DashboardScreen() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const profileDoc = user?.email
+      const profileByUserId = firebaseUid ? await apiService.getProfileByUserId(firebaseUid) : null;
+      const profileByEmail = !profileByUserId && user?.email
         ? await apiService.getProfileByEmail(user.email)
-        : firebaseUid
-          ? await apiService.getProfileByUserId(firebaseUid)
-          : null;
-      const p: FinancialProfile | null = profileDoc ? backendProfileToFinancialProfile(profileDoc) : null;
+        : null;
+      const profileDoc = profileByUserId || profileByEmail;
+      const rawLocalProfile = await AsyncStorage.getItem(PROFILE_KEY);
+      const localProfile: FinancialProfile | null = rawLocalProfile ? JSON.parse(rawLocalProfile) : null;
+      const hydratedProfileDoc = profileDoc || localProfile;
+
+      setProfileDoc(hydratedProfileDoc as any);
+      const p: FinancialProfile | null = profileDoc
+        ? backendProfileToFinancialProfile(profileDoc)
+        : localProfile;
       if (profileDoc) {
         setProfileCompleteness(Number(profileDoc.profile_completeness ?? 0));
         setProfileLayer(String(profileDoc.profile_layer ?? 'Identity & life stage'));
         setMissingFields(Array.isArray(profileDoc.missing_fields) ? profileDoc.missing_fields : []);
         setUnlockedCapabilities(Array.isArray(profileDoc.unlocked_capabilities) ? profileDoc.unlocked_capabilities : []);
         setNextPrompt(profileDoc.next_prompt ?? null);
+      } else if (localProfile) {
+        setProfileCompleteness(0);
+        setProfileLayer('Local profile saved');
+        setMissingFields([]);
+        setUnlockedCapabilities([]);
+        setNextPrompt(null);
       } else {
         setProfileCompleteness(0);
         setProfileLayer('Identity & life stage');
@@ -114,17 +132,127 @@ export default function DashboardScreen() {
         const recs = getFinancialRecommendations(user.userType, p.monthlyIncome, p.riskTolerance, p.financialGoals, p);
         setTips(recs.tips.slice(0, 3));
         try {
+          const profilePayload = profileDoc || localProfile;
           const resp = await apiService.recommendSchemes({
-            age: 28, gender: 'male', state: 'Delhi', occupation: 'salaried',
-            employment_type: (p.employmentType ?? 'FULL_TIME').toLowerCase(),
+            age: Number((profilePayload as any)?.age ?? 30),
+            gender: String((profilePayload as any)?.gender ?? 'other').toLowerCase(),
+            state: String((profilePayload as any)?.state ?? 'Delhi'),
+            occupation: String((profilePayload as any)?.occupation ?? (profilePayload as any)?.employment_type ?? 'salaried').toLowerCase(),
+            employment_type: String((profilePayload as any)?.employment_type ?? (p.employmentType ?? 'FULL_TIME')).toLowerCase(),
             monthly_income: p.monthlyIncome, monthly_expenses: p.monthlyExpenses,
-            total_savings: p.totalSavings, total_debts: p.existingLoans, family_size: 3,
+            total_savings: p.totalSavings,
+            total_debts: p.existingLoans,
+            family_size: Number((profilePayload as any)?.family_size ?? (profilePayload as any)?.household_size ?? 1),
+            city: (profilePayload as any)?.city,
+            has_land: (profilePayload as any)?.has_land,
+            has_bank_account: (profilePayload as any)?.has_bank_account,
+            has_life_insurance: (profilePayload as any)?.has_life_insurance,
+            has_health_insurance: (profilePayload as any)?.has_health_insurance,
           });
           setSchemes(resp.schemes.slice(0, 3));
           setTotalBenefits(resp.total_estimated_benefits);
         } catch { setSchemes([]); }
       }
     } finally { setLoading(false); }
+  };
+
+  const prompt = useMemo(() => {
+    if (promptDismissed) return null;
+    return nextProfilePrompt(profileDoc);
+  }, [promptDismissed, profileDoc]);
+
+  const handlePromptAnswer = async (value: string | boolean | number) => {
+    if (!profileDoc || !prompt || savingPrompt) return;
+
+    const resolvedEmail = String(profileDoc.email || user?.email || '').trim().toLowerCase();
+    const resolvedUserId = String(profileDoc.user_id || profileDoc.firebase_uid || firebaseUid || `email:${resolvedEmail}`);
+    const payload: any = {
+      user_id: resolvedUserId,
+      firebase_uid: resolvedUserId,
+      name: profileDoc.name || profileDoc.display_name || profileDoc.full_name || 'User',
+      full_name: profileDoc.full_name || profileDoc.display_name || profileDoc.name || 'User',
+      display_name: profileDoc.display_name || profileDoc.full_name || profileDoc.name || 'User',
+      email: resolvedEmail,
+      phone_number: profileDoc.phone_number || '',
+      user_type: profileDoc.user_type || 'STUDENT',
+      risk_tolerance: profileDoc.risk_tolerance || 'MODERATE',
+      age: profileDoc.age_confirmed ? profileDoc.age : undefined,
+      age_confirmed: profileDoc.age_confirmed ?? false,
+      gender: profileDoc.gender,
+      state: String(profileDoc.state ?? 'Delhi'),
+      city: profileDoc.city,
+      occupation: String(profileDoc.occupation ?? profileDoc.employment_type ?? 'salaried'),
+      employment_type: String(profileDoc.employment_type ?? 'salaried'),
+      monthly_income: Number(profileDoc.monthly_income ?? 0),
+      monthly_expenses: Number(profileDoc.monthly_expenses ?? 0),
+      total_savings: Number(profileDoc.total_savings ?? 0),
+      total_debts: Number(profileDoc.total_debts ?? profileDoc.existing_loans ?? 0),
+      existing_loans: Number(profileDoc.existing_loans ?? profileDoc.total_debts ?? 0),
+      family_size: Number(profileDoc.family_size ?? profileDoc.household_size ?? 1),
+      household_size: Number(profileDoc.household_size ?? profileDoc.family_size ?? 1),
+      caste_category: profileDoc.caste_category,
+      has_land: profileDoc.has_land,
+      has_bank_account: profileDoc.has_bank_account,
+      has_life_insurance: profileDoc.has_life_insurance,
+      has_health_insurance: profileDoc.has_health_insurance,
+      financial_goals: profileDoc.financial_goals,
+      investment_experience: profileDoc.investment_experience,
+      age_band: profileDoc.age_band,
+      income_range: profileDoc.income_range,
+      income_regular: profileDoc.income_regular,
+      earning_members: profileDoc.earning_members,
+      housing_status: profileDoc.housing_status,
+      marital_status: profileDoc.marital_status,
+      minority_status: profileDoc.minority_status,
+      disability_status: profileDoc.disability_status,
+      disability_percentage: profileDoc.disability_percentage,
+      district: profileDoc.district,
+      urban_rural: profileDoc.urban_rural,
+      domicile_years: profileDoc.domicile_years,
+      aspirational_district: profileDoc.aspirational_district,
+      special_region_flag: profileDoc.special_region_flag,
+      dependent_children: profileDoc.dependent_children,
+      senior_citizens_in_household: profileDoc.senior_citizens_in_household,
+      single_woman_led_household: profileDoc.single_woman_led_household,
+      occupation_subtype: profileDoc.occupation_subtype,
+      sector: profileDoc.sector,
+      employment_proof_available: profileDoc.employment_proof_available,
+      education_level: profileDoc.education_level,
+      student_status: profileDoc.student_status,
+      institution_type: profileDoc.institution_type,
+      course_stream: profileDoc.course_stream,
+      jan_dhan_account: profileDoc.jan_dhan_account,
+      has_aadhaar: profileDoc.has_aadhaar,
+      has_pan: profileDoc.has_pan,
+      landholding_acres: profileDoc.landholding_acres,
+      irrigation_status: profileDoc.irrigation_status,
+      housing_ownership_type: profileDoc.housing_ownership_type,
+      pmay_eligible: profileDoc.pmay_eligible,
+      enrolled_pmjjby: profileDoc.enrolled_pmjjby,
+      enrolled_pmsby: profileDoc.enrolled_pmsby,
+      enrolled_apy: profileDoc.enrolled_apy,
+      enrolled_esic: profileDoc.enrolled_esic,
+      enrolled_epfo: profileDoc.enrolled_epfo,
+      application_history_status: profileDoc.application_history_status,
+      benefit_cap_reached: profileDoc.benefit_cap_reached,
+      has_ration_card: profileDoc.has_ration_card,
+      has_caste_certificate: profileDoc.has_caste_certificate,
+      has_disability_certificate: profileDoc.has_disability_certificate,
+      has_income_certificate: profileDoc.has_income_certificate,
+      has_domicile_certificate: profileDoc.has_domicile_certificate,
+      has_bank_passbook: profileDoc.has_bank_passbook,
+      updated_at_client: new Date().toISOString(),
+    };
+
+    applyPromptAnswerToPayload(payload, prompt, value);
+
+    setSavingPrompt(true);
+    try {
+      await apiService.saveProfile(payload);
+      await loadData();
+    } finally {
+      setSavingPrompt(false);
+    }
   };
 
   const score = calculateHealthScore(profile);
@@ -140,7 +268,7 @@ export default function DashboardScreen() {
       <ScrollView
         style={st.scroll}
         contentContainerStyle={st.content}
-        showsVerticalScrollIndicator={false}
+        showsVerticalScrollIndicator
       >
         <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
           {/* Header */}
@@ -159,6 +287,28 @@ export default function DashboardScreen() {
               This app helps you discover financial opportunities. Applications are processed on official external websites.
             </Text>
           </View>
+
+          {prompt && (
+            <View style={st.promptCard}>
+              <Text style={st.promptTitle}>{prompt.title}</Text>
+              <Text style={st.promptSubtitle}>{prompt.subtitle}</Text>
+              <View style={st.promptOptions}>
+                {prompt.options.map((option) => (
+                  <TouchableOpacity
+                    key={`${prompt.key}-${String(option.value)}`}
+                    style={st.promptChip}
+                    onPress={() => void handlePromptAnswer(option.value)}
+                    disabled={savingPrompt}
+                  >
+                    <Text style={st.promptChipText}>{option.label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <TouchableOpacity onPress={() => setPromptDismissed(true)} disabled={savingPrompt}>
+                <Text style={st.promptSkip}>{savingPrompt ? 'Saving...' : 'Skip for now'}</Text>
+              </TouchableOpacity>
+            </View>
+          )}
           {/* Profile completeness */}
           <View style={st.completenessCard}>
             <View style={st.completenessRow}>
@@ -300,6 +450,13 @@ const st = StyleSheet.create({
   avatarTxt: { ...AITypography.h3, color: AIColors.primary },
   notice: { backgroundColor: AIColors.secondaryDim, borderRadius: AIRadius.md, padding: AISpacing.sm, marginBottom: AISpacing.md, borderLeftWidth: 3, borderLeftColor: AIColors.secondary },
   noticeTxt: { ...AITypography.bodySmall, color: AIColors.textSecondary },
+  promptCard: { backgroundColor: AIColors.surface, borderRadius: AIRadius.lg, borderWidth: 1, borderColor: AIColors.borderGlow, padding: AISpacing.md, marginBottom: AISpacing.md },
+  promptTitle: { ...AITypography.h3, color: AIColors.text, marginBottom: 4 },
+  promptSubtitle: { ...AITypography.bodySmall, color: AIColors.textSecondary, marginBottom: AISpacing.sm },
+  promptOptions: { flexDirection: 'row', flexWrap: 'wrap', gap: AISpacing.sm, marginBottom: AISpacing.sm },
+  promptChip: { backgroundColor: AIColors.backgroundSecondary, borderWidth: 1, borderColor: AIColors.border, borderRadius: AIRadius.full, paddingHorizontal: AISpacing.md, paddingVertical: 7 },
+  promptChipText: { ...AITypography.label, color: AIColors.textSecondary },
+  promptSkip: { ...AITypography.bodySmall, color: AIColors.primary },
   completenessCard: { backgroundColor: AIColors.surface, borderRadius: AIRadius.xl, padding: AISpacing.md, marginBottom: AISpacing.md, borderWidth: 1, borderColor: AIColors.borderGlow, ...AIShadows.md },
   completenessRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   completenessLabel: { ...AITypography.labelSmall, color: AIColors.textMuted, marginBottom: 2 },

@@ -69,7 +69,12 @@ export default function TransactionsScreen({ navigation }: { navigation: Navigat
   return (
     <SafeAreaView style={styles.safe}>
       <GridBackdrop />
-      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator
+        keyboardShouldPersistTaps="handled"
+      >
         <ScreenHeader
           title="Transactions"
           subtitle="Track income, expenses, and statement imports."

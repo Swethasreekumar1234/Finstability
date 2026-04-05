@@ -168,10 +168,9 @@ export type RootStackParamList = {
   SpendingInsights: undefined;
 };
 
-// Bottom tab navigation param types  (Home · Health · Goals · Benefits · Profile)
+// Bottom tab navigation param types  (Home · Transactions · Goals · Benefits · Profile)
 export type TabParamList = {
   Home: undefined;
-  Health: undefined;
   Transactions: undefined;
   Goals: undefined;
   Benefits: undefined;

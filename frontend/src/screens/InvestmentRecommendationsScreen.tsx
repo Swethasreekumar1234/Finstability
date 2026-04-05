@@ -144,7 +144,7 @@ export default function InvestmentRecommendationsScreen() {
   const [asOf, setAsOf] = useState<string | null>(null);
   const [mode, setMode] = useState<'beginner' | 'confident'>('beginner');
   const [expandedCards, setExpandedCards] = useState<Record<string, boolean>>({});
-  const [showAlternatives, setShowAlternatives] = useState(false);
+  const [showAlternatives, setShowAlternatives] = useState(true);
   const [showGlossary, setShowGlossary] = useState(false);
 
   useFocusEffect(
@@ -265,7 +265,11 @@ export default function InvestmentRecommendationsScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <GridBackdrop />
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator
+        keyboardShouldPersistTaps="handled"
+      >
         <ScreenHeader
           title="Investment Recommendations"
           subtitle={modeSubtitle}
@@ -484,7 +488,7 @@ export default function InvestmentRecommendationsScreen() {
           <Text style={styles.noticeText}>Investments are market-linked. Review risk and diversify before investing.</Text>
         </View>
 
-        <View style={{ height: 96 }} />
+        <View style={{ height: 140 }} />
       </ScrollView>
     </SafeAreaView>
   );
@@ -492,7 +496,7 @@ export default function InvestmentRecommendationsScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: AIColors.background },
-  content: { padding: AISpacing.md },
+  content: { padding: AISpacing.md, paddingBottom: AISpacing.xxxl, flexGrow: 1 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: AIColors.background },
   heroCard: {
     backgroundColor: AIColors.surface,

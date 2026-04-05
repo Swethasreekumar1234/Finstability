@@ -5,11 +5,13 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { FinancialGoalLabels, FinancialProfile } from '../types';
+import { FinancialGoalLabels, FinancialProfile, RootStackParamList } from '../types';
 import { AIColors, AIRadius, AISpacing, AIShadows } from '../theme/aiTheme';
 import { calculateHealthScore } from './DashboardScreen';
+import { ScreenHeader } from '../components/ui';
 
 const FINANCIAL_PROFILE_KEY = 'financial_profile';
 
@@ -96,6 +98,7 @@ function sparkline(seed: number): number[] {
 }
 
 export default function FinancialHealthScoreScreen() {
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [profile, setProfile] = useState<FinancialProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -141,8 +144,12 @@ export default function FinancialHealthScoreScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <Text style={styles.pageTitle}>Financial Health</Text>
-        <Text style={styles.pageSubtitle}>Score built from savings, debt, goals, and cashflow quality.</Text>
+        <ScreenHeader
+          title="Financial Health"
+          subtitle="Score built from savings, debt, goals, and cashflow quality."
+          onBack={navigation.canGoBack() ? () => navigation.goBack() : undefined}
+          backLabel="Back"
+        />
 
         <View style={styles.heroCard}>
           <View style={[styles.circleOuter, { borderColor: level.color + '44' }]}>
