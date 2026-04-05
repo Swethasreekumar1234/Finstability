@@ -18,7 +18,6 @@ import Slider from '@react-native-community/slider';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   EmploymentType,
   EmploymentTypeLabels,
@@ -33,8 +32,6 @@ import { AIColors, AIRadius, AISpacing, AIShadows, AITypography } from '../theme
 import { apiService } from '../services/apiService';
 import { useAuthStore } from '../store/authStore';
 import { GridBackdrop, ScreenHeader } from '../components/ui';
-
-const FINANCIAL_PROFILE_KEY = 'financial_profile';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'FinancialInput'>;
@@ -76,21 +73,26 @@ export default function FinancialInputScreen({ navigation, route }: Props) {
   const [goals, setGoals] = useState<FinancialGoal[]>([]);
 
   useEffect(() => {
-    AsyncStorage.getItem(FINANCIAL_PROFILE_KEY)
-      .then((raw) => {
-        if (!raw) return;
-        const p: FinancialProfile = JSON.parse(raw);
-        setMonthlyIncome(String(p.monthlyIncome));
-        setMonthlyExpenses(String(p.monthlyExpenses));
-        setTotalSavings(String(p.totalSavings));
-        setExistingLoans(String(p.existingLoans));
-        setEmploymentType(p.employmentType);
-        setRiskTolerance(p.riskTolerance);
-        setInvestmentExperience(p.investmentExperience);
-        setGoals(p.financialGoals || []);
-      })
-      .finally(() => setLoading(false));
-  }, []);
+    const loadProfile = async () => {
+      try {
+        const profile = currentUser?.email ? await apiService.getProfileByEmail(currentUser.email) : null;
+        if (profile) {
+          setMonthlyIncome(String(profile.monthly_income ?? 0));
+          setMonthlyExpenses(String(profile.monthly_expenses ?? 0));
+          setTotalSavings(String(profile.total_savings ?? 0));
+          setExistingLoans(String(profile.existing_loans ?? profile.total_debts ?? 0));
+          setEmploymentType((String(profile.employment_type ?? 'FULL_TIME').toUpperCase() as EmploymentType));
+          setRiskTolerance((String(profile.risk_tolerance ?? 'MODERATE').toUpperCase() as RiskTolerance));
+          setInvestmentExperience(Number(profile.investment_experience ?? 4));
+          setGoals(Array.isArray(profile.financial_goals) ? profile.financial_goals as FinancialGoal[] : []);
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    void loadProfile();
+  }, [currentUser?.email]);
 
   const completion = useMemo(() => {
     let done = 0;
@@ -125,11 +127,10 @@ export default function FinancialInputScreen({ navigation, route }: Props) {
         financialGoals: goals,
         updatedAt: new Date().toISOString(),
       };
-      await AsyncStorage.setItem(FINANCIAL_PROFILE_KEY, JSON.stringify(profile));
 
       // Sync full financial profile to backend MongoDB using the same user document.
       try {
-        const uid = firebaseUid || await AsyncStorage.getItem('firebaseUid') || `local-${Date.now()}`;
+        const uid = firebaseUid || `mongo-${Date.now()}`;
         const displayName = currentUser?.displayName || currentUser?.fullName || '';
 
         await apiService.saveProfile({
@@ -157,8 +158,10 @@ export default function FinancialInputScreen({ navigation, route }: Props) {
           state: 'Delhi',
           occupation: 'salaried',
         });
-      } catch (mongoError) {
+      } catch (mongoError: any) {
         console.warn('Mongo financial profile sync skipped:', mongoError);
+        Alert.alert('Save failed', mongoError?.message || 'Could not save profile to MongoDB.');
+        return;
       }
 
       // Redirect immediately after save so the flow continues without extra taps.
@@ -167,7 +170,7 @@ export default function FinancialInputScreen({ navigation, route }: Props) {
       } else {
         navigation.goBack();
       }
-    } catch {
+      } catch {
       Alert.alert('Save failed', 'Could not save profile. Please try again.');
     } finally {
       setSaving(false);

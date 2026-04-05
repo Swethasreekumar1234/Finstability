@@ -9,7 +9,6 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { RootStackParamList, FinancialProfile } from '../types';
 import { useAuthStore } from '../store/authStore';
 import { AIColors, AISpacing, AIRadius, AIShadows, AITypography, AISchemeCategoryColors } from '../theme/aiTheme';
@@ -46,6 +45,20 @@ function catColor(cat: string): string {
   return AISchemeCategoryColors[cat] ?? AIColors.primary;
 }
 
+function backendProfileToFinancialProfile(profile: any): FinancialProfile {
+  return {
+    monthlyIncome: Number(profile?.monthly_income ?? 0),
+    monthlyExpenses: Number(profile?.monthly_expenses ?? 0),
+    totalSavings: Number(profile?.total_savings ?? 0),
+    existingLoans: Number(profile?.existing_loans ?? profile?.total_debts ?? 0),
+    employmentType: String(profile?.employment_type ?? 'FULL_TIME').toUpperCase() as FinancialProfile['employmentType'],
+    riskTolerance: String(profile?.risk_tolerance ?? 'MODERATE').toUpperCase() as FinancialProfile['riskTolerance'],
+    investmentExperience: Number(profile?.investment_experience ?? 0),
+    financialGoals: Array.isArray(profile?.financial_goals) ? profile.financial_goals : [],
+    updatedAt: String(profile?.updated_at_client ?? profile?.updated_at ?? new Date().toISOString()),
+  };
+}
+
 export default function DashboardScreen() {
   const nav = useNavigation<StackNav>();
   const { currentUser: user, logout } = useAuthStore();
@@ -68,8 +81,8 @@ export default function DashboardScreen() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const raw = await AsyncStorage.getItem(PROFILE_KEY);
-      const p: FinancialProfile | null = raw ? JSON.parse(raw) : null;
+      const profileDoc = user?.email ? await apiService.getProfileByEmail(user.email) : null;
+      const p: FinancialProfile | null = profileDoc ? backendProfileToFinancialProfile(profileDoc) : null;
       setProfile(p);
       if (p && user) {
         const recs = getFinancialRecommendations(user.userType, p.monthlyIncome, p.riskTolerance, p.financialGoals, p);
@@ -98,7 +111,11 @@ export default function DashboardScreen() {
   return (
     <SafeAreaView style={st.safe}>
       <GridBackdrop />
-      <ScrollView style={st.scroll} contentContainerStyle={st.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={st.scroll}
+        contentContainerStyle={st.content}
+        showsVerticalScrollIndicator={false}
+      >
         <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
           {/* Header */}
           <View style={st.header}>
@@ -221,7 +238,7 @@ export default function DashboardScreen() {
 const st = StyleSheet.create({
   safe: { flex: 1, backgroundColor: AIColors.background },
   scroll: { flex: 1 },
-  content: { padding: AISpacing.md },
+  content: { flexGrow: 1, padding: AISpacing.md, paddingBottom: 140 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: AIColors.background },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: AISpacing.md },
   greeting: { ...AITypography.label, color: AIColors.textSecondary },
