@@ -74,10 +74,13 @@ export const useGoogleAuth = () => {
 
   console.log('Redirect URI:', redirectUri);
 
-  const [request, response, promptAsync] = Google.useIdTokenAuthRequest({
+  const [request, response, promptAsync] = Google.useAuthRequest({
     clientId: GOOGLE_CONFIG.webClientId,
     androidClientId: GOOGLE_CONFIG.androidClientId,
     redirectUri,
+    responseType: 'token',
+    scopes: ['openid', 'profile', 'email'],
+    usePKCE: false,
     extraParams: {
       prompt: 'select_account',
     },

@@ -9,14 +9,10 @@ import {
   sendOtpToPhone,
   verifyOtpAndSignIn,
   signInWithGoogleCredential,
-  checkUserExists,
-  getUserProfile,
-  saveUserProfile,
   signOutUser,
   setPhoneForVerification,
 } from '../config/firebase';
 import { apiService } from '../services/apiService';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface AuthState {
   // Firebase User
@@ -58,7 +54,7 @@ interface AuthState {
   resendOtp: () => Promise<void>;
 
   // Google Auth Actions
-  signInWithGoogle: (idToken: string) => Promise<{ success: boolean; isNewUser: boolean }>;
+  signInWithGoogle: (tokens: { idToken?: string; accessToken?: string }) => Promise<{ success: boolean; isNewUser: boolean }>;
   signInWithEmail: (email: string) => Promise<{ success: boolean; message?: string }>;
   signUpWithEmail: (fullName: string, email: string) => Promise<{ success: boolean; message?: string }>;
   clearError: () => void;
@@ -78,75 +74,16 @@ interface AuthState {
   resetAuthState: () => void;
 }
 
-const normalizeIndianPhone = (phone: string): string => phone.replace(/\D/g, '').slice(-10);
-
-const hasCompleteLocalProfile = async (): Promise<boolean> => {
-  const values = await AsyncStorage.multiGet([
-    'user_fullName',
-    'user_userType',
-    'user_monthlyIncome',
-    'user_riskTolerance',
-  ]);
-
-  const map = Object.fromEntries(values);
-  return Boolean(
-    map.user_fullName?.trim() &&
-      map.user_userType &&
-      map.user_monthlyIncome &&
-      parseFloat(map.user_monthlyIncome) > 0 &&
-      map.user_riskTolerance
-  );
-};
-
-const hasLocalProfileForIdentity = async (identity: {
-  phoneNumber?: string;
-  email?: string | null;
-}): Promise<boolean> => {
-  const complete = await hasCompleteLocalProfile();
-  if (!complete) return false;
-
-  const [storedPhone, storedEmail] = await AsyncStorage.multiGet(['user_phoneNumber', 'user_email']);
-  const savedPhone = storedPhone[1] || '';
-  const savedEmail = (storedEmail[1] || '').trim().toLowerCase();
-
-  if (identity.phoneNumber) {
-    return normalizeIndianPhone(savedPhone) === normalizeIndianPhone(identity.phoneNumber);
-  }
-
-  if (identity.email) {
-    return savedEmail === identity.email.trim().toLowerCase();
-  }
-
-  return true;
-};
-
-const loadUserProfileFromLocal = async (): Promise<User | null> => {
-  const values = await AsyncStorage.multiGet([
-    'user_phoneNumber',
-    'user_fullName',
-    'user_email',
-    'user_userType',
-    'user_monthlyIncome',
-    'user_riskTolerance',
-  ]);
-
-  const map = Object.fromEntries(values);
-  const monthlyIncome = parseFloat(map.user_monthlyIncome || '0');
-
-  if (!map.user_fullName || !map.user_userType || !map.user_riskTolerance || monthlyIncome <= 0) {
-    return null;
-  }
-
-  return {
-    phoneNumber: map.user_phoneNumber || '',
-    fullName: map.user_fullName,
-    email: map.user_email || '',
-    userType: map.user_userType as UserType,
-    monthlyIncome,
-    riskTolerance: map.user_riskTolerance as RiskTolerance,
-    createdAt: Date.now(),
-  };
-};
+const backendProfileToUser = (profile: any): User => ({
+  phoneNumber: profile.phone_number || profile.phoneNumber || '',
+  fullName: profile.display_name || profile.full_name || profile.name || 'User',
+  displayName: profile.display_name || profile.full_name || profile.name || 'User',
+  email: profile.email || '',
+  userType: (profile.user_type as UserType) || UserType.STUDENT,
+  monthlyIncome: Number(profile.monthly_income || profile.monthlyIncome || 0),
+  riskTolerance: (profile.risk_tolerance as RiskTolerance) || (profile.riskTolerance as RiskTolerance) || RiskTolerance.MODERATE,
+  createdAt: Date.now(),
+});
 
 export const useAuthStore = create<AuthState>((set, get) => ({
   // Initial State
@@ -233,30 +170,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         otpState: OtpState.VERIFIED,
         firebaseUid: uid,
       });
-      
-      // Save UID to AsyncStorage
-      await AsyncStorage.setItem('firebaseUid', uid);
-      await AsyncStorage.setItem('phoneNumber', phoneNumber);
 
-      // Check if user profile exists in Firestore or local storage
-      const existsRemote = await checkUserExists(uid);
-      const existsLocal = await hasLocalProfileForIdentity({ phoneNumber });
-
-      if (existsRemote || existsLocal) {
-        if (existsRemote) {
-          await get().loadUserProfile();
-        } else {
-          const localUser = await loadUserProfileFromLocal();
-          if (localUser) {
-            set({ currentUser: localUser });
-          }
-        }
-        set({ isLoggedIn: true });
-        return { success: true, isNewUser: false };
-      } else {
-        // New user - needs profile setup
-        return { success: true, isNewUser: true };
-      }
+      return { success: true, isNewUser: true };
     } catch (error: any) {
       set({
         otpState: OtpState.ERROR,
@@ -282,76 +197,50 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   // Google Sign-In
-  signInWithGoogle: async (idToken: string) => {
+  signInWithGoogle: async ({ idToken, accessToken }) => {
     set({ isGoogleLoading: true, authError: null });
 
     try {
-      const user = await signInWithGoogleCredential(idToken);
+      const user = await signInWithGoogleCredential(idToken, accessToken);
       const uid = user.uid;
-      
-      set({ firebaseUid: uid });
-      
-      // Save UID to AsyncStorage
-      await AsyncStorage.setItem('firebaseUid', uid);
-      
-      // Pre-fill email from Google account
-      if (user.email) {
-        set({ email: user.email });
-      }
-      if (user.displayName) {
-        set({ fullName: user.displayName });
-      }
 
-      // Check if user profile exists in Firestore or local storage
-      const existsRemote = await checkUserExists(uid);
-      const existsLocal = await hasLocalProfileForIdentity({ email: user.email });
+      const profilePayload = {
+        user_id: uid,
+        firebase_uid: uid,
+        name: user.displayName || user.email || 'User',
+        full_name: user.displayName || user.email || 'User',
+        display_name: user.displayName || user.email || 'User',
+        email: user.email || '',
+        phone_number: user.phoneNumber || '',
+        user_type: UserType.STUDENT,
+        risk_tolerance: RiskTolerance.MODERATE,
+        age: 25,
+        gender: 'other',
+        state: 'Delhi',
+        occupation: 'salaried',
+        employment_type: 'salaried',
+        monthly_income: 0,
+        monthly_expenses: 0,
+        total_savings: 0,
+        total_debts: 0,
+        family_size: 1,
+      };
 
-      if (existsRemote || existsLocal) {
-        if (existsRemote) {
-          await get().loadUserProfile();
-        } else {
-          const localUser = await loadUserProfileFromLocal();
-          if (localUser) {
-            set({ currentUser: localUser });
-          }
-        }
+      await apiService.saveProfile(profilePayload);
 
-        // Prefer the active Google account name in UI to avoid stale/local aliases.
-        set((state) => {
-          const googleName = user.displayName?.trim();
-          const googleEmail = user.email?.trim();
-          const current = state.currentUser;
+      const savedProfile = await apiService.getProfileByEmail(user.email || '');
+      const currentUser = savedProfile ? backendProfileToUser(savedProfile) : backendProfileToUser(profilePayload);
 
-          if (!current) {
-            return {
-              currentUser: {
-                phoneNumber: '',
-                fullName: googleName || 'User',
-                displayName: googleName || 'User',
-                email: googleEmail || '',
-                userType: UserType.STUDENT,
-                monthlyIncome: 0,
-                riskTolerance: RiskTolerance.MODERATE,
-                createdAt: Date.now(),
-              },
-            };
-          }
+      set({
+        firebaseUid: uid,
+        email: user.email || '',
+        fullName: user.displayName || user.email || 'User',
+        currentUser,
+        isLoggedIn: true,
+        isGoogleLoading: false,
+      });
 
-          return {
-            currentUser: {
-              ...current,
-              displayName: googleName || current.displayName || current.fullName,
-              email: googleEmail || current.email,
-            },
-          };
-        });
-
-        set({ isLoggedIn: true, isGoogleLoading: false });
-        return { success: true, isNewUser: false };
-      } else {
-        set({ isGoogleLoading: false });
-        return { success: true, isNewUser: true };
-      }
+      return { success: true, isNewUser: false };
     } catch (error: any) {
       set({
         isGoogleLoading: false,
@@ -371,40 +260,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ isGoogleLoading: true, authError: null });
 
     try {
-      // Fast local check first for offline continuity.
-      const localEntries = await AsyncStorage.multiGet([
-        'firebaseUid',
-        'user_email',
-        'user_fullName',
-        'user_userType',
-        'user_monthlyIncome',
-        'user_riskTolerance',
-      ]);
-      const localMap = Object.fromEntries(localEntries);
-      const localEmail = (localMap.user_email || '').trim().toLowerCase();
-
-      if (localEmail && localEmail === cleanEmail) {
-        const localUser: User = {
-          phoneNumber: '',
-          fullName: localMap.user_fullName || 'User',
-          displayName: localMap.user_fullName || 'User',
-          email: cleanEmail,
-          userType: (localMap.user_userType as UserType) || UserType.STUDENT,
-          monthlyIncome: parseFloat(localMap.user_monthlyIncome || '0'),
-          riskTolerance: (localMap.user_riskTolerance as RiskTolerance) || RiskTolerance.MODERATE,
-          createdAt: Date.now(),
-        };
-
-        set({
-          firebaseUid: localMap.firebaseUid || `email-${Date.now()}`,
-          currentUser: localUser,
-          isLoggedIn: true,
-          isGoogleLoading: false,
-        });
-
-        return { success: true };
-      }
-
       const profile = await apiService.getProfileByEmail(cleanEmail);
       if (!profile) {
         set({
@@ -415,30 +270,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       }
 
       const userId = profile.user_id || profile.firebase_uid || `email-${Date.now()}`;
-      const resolvedName = profile.display_name || profile.full_name || profile.name || 'User';
-      const resolvedUserType = (profile.user_type as UserType) || UserType.STUDENT;
-      const resolvedRisk = (profile.risk_tolerance as RiskTolerance) || RiskTolerance.MODERATE;
-      const resolvedIncome = Number(profile.monthly_income || 0);
-
-      await AsyncStorage.multiSet([
-        ['firebaseUid', userId],
-        ['user_fullName', resolvedName],
-        ['user_email', cleanEmail],
-        ['user_userType', resolvedUserType],
-        ['user_monthlyIncome', String(resolvedIncome)],
-        ['user_riskTolerance', resolvedRisk],
-      ]);
-
-      const signedUser: User = {
-        phoneNumber: profile.phone_number || '',
-        fullName: resolvedName,
-        displayName: resolvedName,
-        email: cleanEmail,
-        userType: resolvedUserType,
-        monthlyIncome: resolvedIncome,
-        riskTolerance: resolvedRisk,
-        createdAt: Date.now(),
-      };
+      const signedUser = backendProfileToUser(profile);
 
       set({
         firebaseUid: userId,
@@ -476,7 +308,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     try {
       const userId = `email-${Date.now()}`;
 
-      // Try Mongo persistence, but don't block signup if backend is offline.
+      // Save directly to MongoDB through the backend.
       try {
         await apiService.saveProfile({
           user_id: userId,
@@ -499,18 +331,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           total_debts: 0,
           family_size: 1,
         });
-      } catch (mongoError) {
-        console.warn('Email signup Mongo save skipped:', mongoError);
+      } catch (mongoError: any) {
+        set({
+          isGoogleLoading: false,
+          authError: mongoError?.message || 'Failed to save profile to MongoDB.',
+        });
+        return { success: false, message: mongoError?.message || 'Failed to save profile to MongoDB.' };
       }
-
-      await AsyncStorage.multiSet([
-        ['firebaseUid', userId],
-        ['user_fullName', cleanName],
-        ['user_email', cleanEmail],
-        ['user_userType', UserType.STUDENT],
-        ['user_monthlyIncome', '0'],
-        ['user_riskTolerance', RiskTolerance.MODERATE],
-      ]);
 
       const newUser: User = {
         phoneNumber: '',
@@ -596,7 +423,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ isProfileSaving: true, profileError: null });
 
     try {
-      const uid = firebaseUid || await AsyncStorage.getItem('firebaseUid') || `local-${Date.now()}`;
+      const uid = firebaseUid || `mongo-${Date.now()}`;
 
       const profileData = {
         phoneNumber: phoneNumber || '',
@@ -607,51 +434,27 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         riskTolerance: selectedRiskTolerance,
       };
 
-      // Save to local AsyncStorage first (always works)
-      await AsyncStorage.multiSet([
-        ['user_fullName', profileData.fullName],
-        ['user_email', profileData.email],
-        ['user_userType', profileData.userType],
-        ['user_monthlyIncome', String(profileData.monthlyIncome)],
-        ['user_riskTolerance', profileData.riskTolerance],
-        ['user_phoneNumber', profileData.phoneNumber],
-        ['isLoggedIn', 'true'],
-      ]);
-      
-      // Try to save to Firestore (with timeout, won't block)
-      try {
-        await saveUserProfile(uid, profileData);
-      } catch (firestoreError) {
-        console.warn('Firestore save skipped:', firestoreError);
-        // Continue anyway - local storage is saved
-      }
-
-      // Sync to backend MongoDB (non-blocking for UX)
-      try {
-        await apiService.saveProfile({
-          user_id: uid,
-          firebase_uid: uid,
-          name: profileData.fullName,
-          full_name: profileData.fullName,
-          display_name: profileData.fullName,
-          email: profileData.email,
-          phone_number: profileData.phoneNumber,
-          user_type: profileData.userType,
-          risk_tolerance: profileData.riskTolerance,
-          employment_type: 'salaried',
-          monthly_income: profileData.monthlyIncome,
-          monthly_expenses: 0,
-          total_savings: 0,
-          total_debts: 0,
-          family_size: 1,
-          age: 25,
-          gender: 'other',
-          state: 'Delhi',
-          occupation: 'salaried',
-        });
-      } catch (mongoError) {
-        console.warn('Mongo profile sync skipped:', mongoError);
-      }
+      await apiService.saveProfile({
+        user_id: uid,
+        firebase_uid: uid,
+        name: profileData.fullName,
+        full_name: profileData.fullName,
+        display_name: profileData.fullName,
+        email: profileData.email,
+        phone_number: profileData.phoneNumber,
+        user_type: profileData.userType,
+        risk_tolerance: profileData.riskTolerance,
+        employment_type: 'salaried',
+        monthly_income: profileData.monthlyIncome,
+        monthly_expenses: 0,
+        total_savings: 0,
+        total_debts: 0,
+        family_size: 1,
+        age: 25,
+        gender: 'other',
+        state: 'Delhi',
+        occupation: 'salaried',
+      });
       
       // Update local state
       const user: User = {
@@ -678,25 +481,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   // User Actions
   loadUserProfile: async () => {
     try {
-      const uid = get().firebaseUid || await AsyncStorage.getItem('firebaseUid');
-      
-      if (!uid) return;
+      const email = get().email;
+      if (!email) return;
 
-      const profile = await getUserProfile(uid);
-      
+      const profile = await apiService.getProfileByEmail(email);
       if (profile) {
-        const resolvedName = profile.displayName || profile.fullName || profile.full_name || profile.name || '';
-        const user: User = {
-          phoneNumber: profile.phoneNumber || '',
-          fullName: resolvedName,
-          displayName: resolvedName,
-          email: profile.email || '',
-          userType: profile.userType as UserType,
-          monthlyIncome: profile.monthlyIncome || 0,
-          riskTolerance: profile.riskTolerance as RiskTolerance,
-          createdAt: profile.createdAt?.toMillis?.() || Date.now(),
-        };
-        set({ currentUser: user });
+        set({ currentUser: backendProfileToUser(profile) });
       }
     } catch (error) {
       console.error('Error loading user profile:', error);
@@ -706,7 +496,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   logout: async () => {
     try {
       await signOutUser();
-      await AsyncStorage.multiRemove(['firebaseUid', 'phoneNumber']);
     } catch (error) {
       console.error('Error signing out:', error);
     }
@@ -735,22 +524,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   initialize: async () => {
     try {
-      const uid = await AsyncStorage.getItem('firebaseUid');
-
-      // Require explicit login on app launch instead of silent auto-login.
-      if (uid) {
-        try {
-          await signOutUser();
-        } catch (error) {
-          console.warn('Session sign-out on init failed:', error);
-        }
-      }
-
-      await AsyncStorage.multiRemove(['firebaseUid', 'phoneNumber']);
-      set({ isLoggedIn: false, isInitialized: true });
+      set({ isInitialized: true });
     } catch (error) {
       console.error('Error initializing auth:', error);
-      set({ isLoggedIn: false, isInitialized: true });
+      set({ isInitialized: true });
     }
   },
 

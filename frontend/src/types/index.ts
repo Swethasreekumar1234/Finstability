@@ -2,6 +2,8 @@
  * Type definitions for Finstability app
  */
 
+import { NavigatorScreenParams } from '@react-navigation/native';
+
 // User Types - equivalent to Kotlin enums
 export enum UserType {
   STUDENT = 'STUDENT',
@@ -154,7 +156,7 @@ export type RootStackParamList = {
   PhoneLogin: undefined;
   OtpVerification: { phoneNumber: string; verificationId: string };
   ProfileSetup: undefined;
-  Dashboard: undefined;
+  Dashboard: NavigatorScreenParams<TabParamList> | undefined;
   FinancialInput: { fromOnboarding?: boolean } | undefined;
   FinancialHealth: undefined;
   Tips: undefined;

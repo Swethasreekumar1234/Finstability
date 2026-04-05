@@ -28,8 +28,9 @@ type Props = {
 };
 
 export default function LoginScreen({ navigation }: Props) {
-  const { signInWithGoogle, isGoogleLoading, authError, clearError } = useAuthStore();
+  const { signInWithGoogle, isGoogleLoading, authError, clearError, isLoggedIn } = useAuthStore();
   const [localError, setLocalError] = useState<string | null>(null);
+  const processedGoogleTokenRef = useRef<string | null>(null);
   
   // Animations
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -38,6 +39,51 @@ export default function LoginScreen({ navigation }: Props) {
   const glowAnim = useRef(new Animated.Value(0.3)).current;
 
   const [request, response, promptAsync] = useGoogleAuth();
+
+  const extractGoogleTokens = async (result: any) => {
+    let idToken = result?.params?.id_token || result?.authentication?.idToken || undefined;
+    let accessToken = result?.params?.access_token || result?.authentication?.accessToken || undefined;
+
+    // Expo/Google may return tokens on the callback URL fragment/query instead of params.
+    if ((!idToken && !accessToken) && typeof result?.url === 'string') {
+      try {
+        const parsed = new URL(result.url);
+        const hashParams = new URLSearchParams((parsed.hash || '').replace(/^#/, ''));
+        const queryParams = parsed.searchParams;
+
+        idToken =
+          hashParams.get('id_token') ||
+          queryParams.get('id_token') ||
+          idToken ||
+          undefined;
+
+        accessToken =
+          hashParams.get('access_token') ||
+          queryParams.get('access_token') ||
+          accessToken ||
+          undefined;
+      } catch (error) {
+        console.warn('Failed to parse Google callback URL:', error);
+      }
+    }
+
+    return { idToken, accessToken };
+  };
+
+  const processGoogleTokens = async (tokens: { idToken?: string; accessToken?: string }) => {
+    const tokenKey = tokens.idToken || tokens.accessToken || null;
+    if (!tokenKey) {
+      setLocalError('Google sign-in did not return a valid token. Please try again.');
+      return;
+    }
+
+    if (processedGoogleTokenRef.current === tokenKey) {
+      return;
+    }
+
+    processedGoogleTokenRef.current = tokenKey;
+    await handleGoogleLogin(tokens);
+  };
 
   useEffect(() => {
     // Entry animations
@@ -85,12 +131,21 @@ export default function LoginScreen({ navigation }: Props) {
 
   useEffect(() => {
     if (response?.type === 'success') {
-      const { params } = response;
-      if (params.id_token) {
-        void handleGoogleLogin(params.id_token);
-      }
+      void (async () => {
+        const tokens = await extractGoogleTokens(response);
+        await processGoogleTokens(tokens);
+      })();
     }
   }, [response]);
+
+  useEffect(() => {
+    if (isLoggedIn) {
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'Dashboard', params: { screen: 'Home' } }],
+      });
+    }
+  }, [isLoggedIn, navigation]);
 
   const handlePhoneLogin = () => {
     clearError();
@@ -103,15 +158,15 @@ export default function LoginScreen({ navigation }: Props) {
     navigation.navigate('EmailSignin');
   };
 
-  const handleGoogleLogin = async (idToken: string) => {
+  const handleGoogleLogin = async (tokens: { idToken?: string; accessToken?: string }) => {
     setLocalError(null);
     try {
-      const result = await signInWithGoogle(idToken);
+      const result = await signInWithGoogle(tokens);
       if (!result.success) return;
 
       navigation.reset({
         index: 0,
-        routes: [{ name: 'Dashboard' }],
+        routes: [{ name: 'Dashboard', params: { screen: 'Home' } }],
       });
     } catch (error: any) {
       setLocalError(error?.message || 'Google sign-in failed');
@@ -122,7 +177,12 @@ export default function LoginScreen({ navigation }: Props) {
     clearError();
     setLocalError(null);
     try {
-      await promptAsync({ showInRecents: true });
+      const result = await promptAsync({ showInRecents: true });
+
+      if (result?.type === 'success') {
+        const tokens = await extractGoogleTokens(result);
+        await processGoogleTokens(tokens);
+      }
     } catch (error) {
       console.error('Google prompt error:', error);
     }

@@ -17,13 +17,6 @@ import {
   GoogleAuthProvider,
   RecaptchaVerifier,
 } from 'firebase/auth';
-import {
-  getFirestore,
-  doc,
-  getDoc,
-  setDoc,
-  serverTimestamp,
-} from 'firebase/firestore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 import type { Auth } from 'firebase/auth';
@@ -60,7 +53,7 @@ try {
 }
 
 export { auth };
-export const db = getFirestore(app);
+export const db = null;
 
 // Set language for phone auth
 auth.languageCode = 'en';
@@ -182,9 +175,16 @@ export const verifyOtpAndSignIn = async (
 /**
  * Sign in with Google credential
  */
-export const signInWithGoogleCredential = async (idToken: string): Promise<User> => {
+export const signInWithGoogleCredential = async (
+  idToken?: string,
+  accessToken?: string
+): Promise<User> => {
   try {
-    const credential = GoogleAuthProvider.credential(idToken);
+    if (!idToken && !accessToken) {
+      throw new Error('Missing Google auth token');
+    }
+
+    const credential = GoogleAuthProvider.credential(idToken ?? null, accessToken ?? null);
     const result = await signInWithCredential(auth, credential);
     return result.user;
   } catch (error: any) {
@@ -194,65 +194,62 @@ export const signInWithGoogleCredential = async (idToken: string): Promise<User>
 };
 
 /**
- * Check if user profile exists in Firestore
+ * Check if user profile exists in local storage
  */
 export const checkUserExists = async (uid: string): Promise<boolean> => {
-  try {
-    const userDoc = await getDoc(doc(db, 'users', uid));
-    return userDoc.exists();
-  } catch (error) {
-    console.error('Error checking user:', error);
-    return false;
-  }
+  const storedUid = await AsyncStorage.getItem('firebaseUid');
+  return storedUid === uid;
 };
 
 /**
- * Get user profile from Firestore
+ * Get user profile from local storage
  */
 export const getUserProfile = async (uid: string) => {
-  try {
-    const userDoc = await getDoc(doc(db, 'users', uid));
-    if (userDoc.exists()) {
-      return userDoc.data();
-    }
-    return null;
-  } catch (error) {
-    console.error('Error getting user profile:', error);
-    return null;
-  }
+  const storedUid = await AsyncStorage.getItem('firebaseUid');
+  if (storedUid !== uid) return null;
+
+  const values = await AsyncStorage.multiGet([
+    'user_phoneNumber',
+    'user_fullName',
+    'user_email',
+    'user_userType',
+    'user_monthlyIncome',
+    'user_riskTolerance',
+  ]);
+
+  const map = Object.fromEntries(values);
+  if (!map.user_fullName) return null;
+
+  return {
+    phoneNumber: map.user_phoneNumber || '',
+    fullName: map.user_fullName || '',
+    email: map.user_email || '',
+    userType: map.user_userType,
+    monthlyIncome: parseFloat(map.user_monthlyIncome || '0'),
+    riskTolerance: map.user_riskTolerance,
+    createdAt: Date.now(),
+  };
 };
 
 /**
- * Save user profile to Firestore with timeout
+ * Save user profile to local storage
  */
 export const saveUserProfile = async (uid: string, profileData: any): Promise<boolean> => {
-  const TIMEOUT_MS = 8000; // 8 second timeout
-  
-  const saveToFirestore = async () => {
-    await setDoc(doc(db, 'users', uid), {
-      ...profileData,
-      uid,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    });
-    return true;
-  };
-
-  const timeout = new Promise<never>((_, reject) => {
-    setTimeout(() => reject(new Error('Firestore timeout')), TIMEOUT_MS);
-  });
-
   try {
-    // Race between Firestore save and timeout
-    await Promise.race([saveToFirestore(), timeout]);
-    console.log('Profile saved to Firestore');
+    await AsyncStorage.multiSet([
+      ['firebaseUid', uid],
+      ['user_phoneNumber', profileData.phoneNumber || ''],
+      ['user_fullName', profileData.fullName || ''],
+      ['user_email', profileData.email || ''],
+      ['user_userType', String(profileData.userType || '')],
+      ['user_monthlyIncome', String(profileData.monthlyIncome || 0)],
+      ['user_riskTolerance', String(profileData.riskTolerance || '')],
+    ]);
+    console.log('Profile saved locally');
     return true;
   } catch (error: any) {
-    console.warn('Firestore save failed or timed out:', error.message);
-    // Don't throw - just return true to allow navigation to continue
-    // Profile data is already in local state/AsyncStorage
-    console.log('Continuing with local storage only');
-    return true;
+    console.warn('Local profile save failed:', error?.message || error);
+    return false;
   }
 };
 
