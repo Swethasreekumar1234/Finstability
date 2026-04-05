@@ -144,8 +144,13 @@ export default function BenefitsScreen() {
         : null;
       const profileDoc = profileByUserId || profileByEmail;
       setProfileDoc(profileDoc);
+      const resolvedEmail = String(profileDoc?.email || currentUser?.email || '').trim().toLowerCase();
+      const resolvedUserId = String(profileDoc?.user_id || profileDoc?.firebase_uid || firebaseUid || `email:${resolvedEmail}`);
 
       const bp = {
+        user_id: resolvedUserId,
+        firebase_uid: resolvedUserId,
+        email: resolvedEmail,
         age: profileDoc?.age_confirmed ? Number(profileDoc?.age ?? 30) : undefined,
         age_confirmed: profileDoc?.age_confirmed ?? false,
         gender: String(profileDoc?.gender ?? 'other').toLowerCase(),

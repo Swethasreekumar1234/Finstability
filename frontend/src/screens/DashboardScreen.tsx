@@ -136,7 +136,12 @@ export default function DashboardScreen() {
         setTips(recs.tips.slice(0, 3));
         try {
           const profilePayload = profileDoc || localProfile;
+          const resolvedEmail = String((profilePayload as any)?.email || user?.email || '').trim().toLowerCase();
+          const resolvedUserId = String((profilePayload as any)?.user_id || (profilePayload as any)?.firebase_uid || firebaseUid || `email:${resolvedEmail}`);
           const resp = await apiService.recommendSchemes({
+            user_id: resolvedUserId,
+            firebase_uid: resolvedUserId,
+            email: resolvedEmail,
             age: Number((profilePayload as any)?.age ?? 30),
             gender: String((profilePayload as any)?.gender ?? 'other').toLowerCase(),
             state: String((profilePayload as any)?.state ?? 'Delhi'),

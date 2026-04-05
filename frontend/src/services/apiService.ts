@@ -197,8 +197,10 @@ export interface MonthlySummary {
 
 async function fetchFromBackend(path: string, init: RequestInit, timeoutMs: number): Promise<Response> {
   let lastError: unknown = null;
+  const attempted: string[] = [];
 
   for (const baseUrl of getBackendBaseUrls()) {
+    attempted.push(baseUrl);
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -215,7 +217,8 @@ async function fetchFromBackend(path: string, init: RequestInit, timeoutMs: numb
     }
   }
 
-  throw lastError instanceof Error ? lastError : new Error('Backend unavailable');
+  const lastMessage = lastError instanceof Error ? lastError.message : 'unknown error';
+  throw new Error(`Backend unavailable. Tried: ${attempted.join(', ')}. Last error: ${lastMessage}`);
 }
 
 async function post<T>(path: string, body: unknown): Promise<T> {
