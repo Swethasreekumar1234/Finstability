@@ -1,53 +1,110 @@
 /**
- * Profile Setup Screen - Futuristic AI Financial Platform
- * Apple/Stripe inspired dark theme with glassmorphism
+ * Conversational Profile Setup Screen
+ * Progressive onboarding using layered profile questions.
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  View,
+  ActivityIndicator,
+  Animated,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  StyleSheet,
-  ScrollView,
-  KeyboardAvoidingView,
-  Platform,
-  ActivityIndicator,
-  Animated,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import {
+  FinancialGoal,
+  FinancialGoalLabels,
+  RiskTolerance,
+  RiskToleranceLabels,
   RootStackParamList,
   UserType,
   UserTypeLabels,
-  RiskTolerance,
-  RiskToleranceLabels,
 } from '../types';
 import { useAuthStore } from '../store/authStore';
-import { AIColors, AISpacing, AIRadius, AIShadows, AITypography } from '../theme/aiTheme';
-import { GlassCard, ProgressBar, SelectionCard } from '../components/ai';
+import { AIColors, AIRadius, AISpacing, AITypography } from '../theme/aiTheme';
+import { ProgressBar } from '../components/ai';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'ProfileSetup'>;
 };
 
-const userTypes = [
-  { type: UserType.STUDENT, icon: '○', description: 'Learning to manage finances' },
-  { type: UserType.WORKING_PROFESSIONAL, icon: '◇', description: 'Building wealth actively' },
-  { type: UserType.RETIREE, icon: '□', description: 'Planning for retirement' },
-  { type: UserType.SMALL_BUSINESS_OWNER, icon: '△', description: 'Managing business finances' },
+const TOTAL_STEPS = 5;
+
+const userTypeChoices = [
+  UserType.STUDENT,
+  UserType.WORKING_PROFESSIONAL,
+  UserType.SMALL_BUSINESS_OWNER,
+  UserType.RETIREE,
 ];
 
-const riskLevels = [
-  { level: RiskTolerance.LOW, icon: '—', description: 'Prefer stability over high returns' },
-  { level: RiskTolerance.MODERATE, icon: '≡', description: 'Balance between risk and safety' },
-  { level: RiskTolerance.HIGH, icon: '↑', description: 'Comfortable with market volatility' },
+const employmentChoices = [
+  { label: 'Salaried', value: 'salaried' },
+  { label: 'Self-employed', value: 'self_employed' },
+  { label: 'Farmer', value: 'farmer' },
+  { label: 'Student', value: 'student' },
+  { label: 'Retired', value: 'retired' },
+  { label: 'Unemployed', value: 'unemployed' },
 ];
+
+const housingChoices = [
+  { label: 'Own home', value: 'owned' },
+  { label: 'Renting', value: 'rented' },
+  { label: 'With family', value: 'living_with_family' },
+  { label: 'Other', value: 'other' },
+];
+
+const ageBandChoices = [
+  '18-24',
+  '25-34',
+  '35-44',
+  '45-54',
+  '55+',
+];
+
+const householdSizeChoices = [1, 2, 3, 4, 5, 6];
+const earningMemberChoices = [1, 2, 3, 4];
+
+const incomeRangeChoices = [
+  { label: 'Below ₹25k', value: '0-25000', monthlyIncomeHint: '20000' },
+  { label: '₹25k - ₹50k', value: '25000-50000', monthlyIncomeHint: '40000' },
+  { label: '₹50k - ₹1L', value: '50000-100000', monthlyIncomeHint: '75000' },
+  { label: 'Above ₹1L', value: '100000+', monthlyIncomeHint: '120000' },
+];
+
+const yesNoChoices = [
+  { label: 'Yes', value: true },
+  { label: 'No', value: false },
+];
+
+function Chip({
+  selected,
+  label,
+  onPress,
+}: {
+  selected: boolean;
+  label: string;
+  onPress: () => void;
+}) {
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      style={[styles.chip, selected && styles.chipSelected]}
+      activeOpacity={0.85}
+    >
+      <Text style={[styles.chipText, selected && styles.chipTextSelected]}>{label}</Text>
+    </TouchableOpacity>
+  );
+}
 
 export default function ProfileSetupScreen({ navigation }: Props) {
-  const { 
+  const {
     currentUser,
     fullName,
     selectedUserType,
@@ -61,367 +118,454 @@ export default function ProfileSetupScreen({ navigation }: Props) {
     isProfileSaving,
     profileError,
   } = useAuthStore();
-  
+
   const [step, setStep] = useState(1);
+
   const [localFullName, setLocalFullName] = useState(currentUser?.displayName || fullName || '');
-  const [localEmail, setLocalEmail] = useState(currentUser?.email || '');
+  const [localCity, setLocalCity] = useState('');
+  const [localState, setLocalState] = useState('Delhi');
+  const [localAgeBand, setLocalAgeBand] = useState<string>('25-34');
   const [localUserType, setLocalUserType] = useState<UserType | null>(selectedUserType);
-  const [localMonthlyIncome, setLocalMonthlyIncome] = useState(monthlyIncome || '');
+  const [localEmploymentType, setLocalEmploymentType] = useState('salaried');
+  const [localHouseholdSize, setLocalHouseholdSize] = useState(1);
+  const [localHousingStatus, setLocalHousingStatus] = useState('owned');
+  const [localIncomeRange, setLocalIncomeRange] = useState('25000-50000');
+  const [localMonthlyIncome, setLocalMonthlyIncome] = useState(monthlyIncome || '40000');
+  const [localIncomeRegular, setLocalIncomeRegular] = useState<boolean | null>(true);
+  const [localEarningMembers, setLocalEarningMembers] = useState(1);
+  const [localHasBankAccount, setLocalHasBankAccount] = useState<boolean | null>(true);
+  const [localHasLand, setLocalHasLand] = useState<boolean | null>(false);
+  const [localHasLifeInsurance, setLocalHasLifeInsurance] = useState<boolean | null>(false);
+  const [localHasHealthInsurance, setLocalHasHealthInsurance] = useState<boolean | null>(false);
+  const [localGoals, setLocalGoals] = useState<FinancialGoal[]>([]);
   const [localRiskTolerance, setLocalRiskTolerance] = useState<RiskTolerance | null>(selectedRiskTolerance);
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(30)).current;
-
-  const totalSteps = 4;
-  const progress = step / totalSteps;
+  const slideAnim = useRef(new Animated.Value(24)).current;
 
   useEffect(() => {
+    fadeAnim.setValue(0);
+    slideAnim.setValue(24);
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
-        duration: 400,
+        duration: 280,
         useNativeDriver: true,
       }),
       Animated.spring(slideAnim, {
         toValue: 0,
-        tension: 80,
-        friction: 10,
+        tension: 70,
+        friction: 9,
         useNativeDriver: true,
       }),
     ]).start();
   }, [step]);
 
-  const animateStepChange = () => {
-    fadeAnim.setValue(0);
-    slideAnim.setValue(30);
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 400,
-        useNativeDriver: true,
-      }),
-      Animated.spring(slideAnim, {
-        toValue: 0,
-        tension: 80,
-        friction: 10,
-        useNativeDriver: true,
-      }),
-    ]).start();
+  const progress = useMemo(() => step / TOTAL_STEPS, [step]);
+
+  const stepUnlockText = useMemo(() => {
+    if (step === 1) return 'Unlocks: state-aware scheme matching';
+    if (step === 2) return 'Unlocks: life-stage recommendations';
+    if (step === 3) return 'Unlocks: budgeting and saving guidance';
+    if (step === 4) return 'Unlocks: insurance and debt-aware insights';
+    return 'Unlocks: goal-based planning and AI tips';
+  }, [step]);
+
+  const canProceed = useMemo(() => {
+    if (step === 1) return localFullName.trim().length >= 2 && localState.trim().length > 0;
+    if (step === 2) return localUserType !== null && localEmploymentType.length > 0;
+    if (step === 3) {
+      return (
+        localIncomeRange.length > 0 &&
+        localMonthlyIncome.trim().length > 0 &&
+        !isNaN(Number(localMonthlyIncome)) &&
+        localHasBankAccount !== null &&
+        localIncomeRegular !== null
+      );
+    }
+    if (step === 4) return localHasLand !== null && localHasLifeInsurance !== null && localHasHealthInsurance !== null;
+    return localGoals.length > 0 && localRiskTolerance !== null;
+  }, [
+    step,
+    localFullName,
+    localState,
+    localUserType,
+    localEmploymentType,
+    localIncomeRange,
+    localMonthlyIncome,
+    localHasBankAccount,
+    localIncomeRegular,
+    localHasLand,
+    localHasLifeInsurance,
+    localHasHealthInsurance,
+    localGoals,
+    localRiskTolerance,
+  ]);
+
+  const inferredAge = useMemo(() => {
+    if (localAgeBand === '18-24') return 22;
+    if (localAgeBand === '25-34') return 30;
+    if (localAgeBand === '35-44') return 39;
+    if (localAgeBand === '45-54') return 49;
+    return 58;
+  }, [localAgeBand]);
+
+  const toggleGoal = (goal: FinancialGoal) => {
+    setLocalGoals((prev) =>
+      prev.includes(goal) ? prev.filter((g) => g !== goal) : [...prev, goal]
+    );
   };
 
-  const handleNext = () => {
-    if (step < totalSteps) {
-      setStep(step + 1);
-      animateStepChange();
-    } else {
-      handleSubmit();
+  const nextStep = () => {
+    if (step < TOTAL_STEPS) {
+      setStep((s) => s + 1);
     }
   };
 
-  const handleBack = () => {
+  const previousStep = () => {
     if (step > 1) {
-      setStep(step - 1);
-      animateStepChange();
+      setStep((s) => s - 1);
     }
   };
 
   const handleSubmit = async () => {
     if (!localUserType || !localRiskTolerance) return;
-    
-    // Update store state with local values
-    updateFullName(localFullName);
+
+    updateFullName(localFullName.trim());
     updateUserType(localUserType);
     updateMonthlyIncome(localMonthlyIncome);
     updateRiskTolerance(localRiskTolerance);
-    
-    // Small delay to ensure store is updated
-    await new Promise(resolve => setTimeout(resolve, 100));
-    
-    const success = await saveProfile();
+
+    await new Promise((resolve) => setTimeout(resolve, 80));
+
+    const success = await saveProfile({
+      city: localCity.trim(),
+      state: localState.trim(),
+      age: inferredAge,
+      ageBand: localAgeBand,
+      employmentType: localEmploymentType,
+      occupation: localEmploymentType,
+      householdSize: localHouseholdSize,
+      housingStatus: localHousingStatus,
+      incomeRange: localIncomeRange,
+      incomeRegular: localIncomeRegular ?? true,
+      earningMembers: localEarningMembers,
+      hasBankAccount: localHasBankAccount ?? true,
+      hasLand: localHasLand ?? false,
+      financialGoals: localGoals,
+      hasLifeInsurance: localHasLifeInsurance ?? false,
+      hasHealthInsurance: localHasHealthInsurance ?? false,
+      hasPpf: false,
+      hasFd: false,
+      hasMutualFunds: false,
+      hasGoldInvestments: false,
+    });
 
     if (success) {
-      navigation.reset({
-        index: 0,
-        routes: [{ name: 'Dashboard' }],
-      });
+      navigation.reset({ index: 0, routes: [{ name: 'Dashboard' }] });
     }
   };
 
-  const canProceed = () => {
-    switch (step) {
-      case 1:
-        return localFullName.trim().length >= 2;
-      case 2:
-        return localUserType !== null;
-      case 3:
-        return localMonthlyIncome.trim().length > 0 && !isNaN(parseFloat(localMonthlyIncome));
-      case 4:
-        return localRiskTolerance !== null;
-      default:
-        return false;
+  const renderStepContent = () => {
+    if (step === 1) {
+      return (
+        <>
+          <Text style={styles.questionTitle}>What should we call you?</Text>
+          <Text style={styles.questionSubtitle}>We will personalize your dashboard greeting and scheme prompts.</Text>
+          <TextInput
+            style={styles.input}
+            value={localFullName}
+            onChangeText={setLocalFullName}
+            placeholder="Your full name"
+            placeholderTextColor={AIColors.textMuted}
+            autoCapitalize="words"
+          />
+
+          <Text style={styles.fieldLabel}>Which city are you in?</Text>
+          <TextInput
+            style={styles.input}
+            value={localCity}
+            onChangeText={setLocalCity}
+            placeholder="City"
+            placeholderTextColor={AIColors.textMuted}
+            autoCapitalize="words"
+          />
+
+          <Text style={styles.fieldLabel}>Which state are you in?</Text>
+          <TextInput
+            style={styles.input}
+            value={localState}
+            onChangeText={setLocalState}
+            placeholder="State"
+            placeholderTextColor={AIColors.textMuted}
+            autoCapitalize="words"
+          />
+
+          <Text style={styles.fieldLabel}>Age band</Text>
+          <View style={styles.chipWrap}>
+            {ageBandChoices.map((item) => (
+              <Chip key={item} label={item} selected={localAgeBand === item} onPress={() => setLocalAgeBand(item)} />
+            ))}
+          </View>
+        </>
+      );
     }
-  };
 
-  const renderStep = () => {
-    switch (step) {
-      case 1:
-        return (
-          <Animated.View
-            style={[styles.stepContent, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}
-          >
-            <View style={styles.stepHeader}>
-              <Text style={styles.stepIcon}>01</Text>
-              <Text style={styles.stepTitle}>Personal Information</Text>
-              <Text style={styles.stepSubtitle}>Let&apos;s get to know you better</Text>
-            </View>
+    if (step === 2) {
+      return (
+        <>
+          <Text style={styles.questionTitle}>What best describes you today?</Text>
+          <Text style={styles.questionSubtitle}>This helps us match life-stage relevant schemes.</Text>
 
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>FULL NAME</Text>
-              <View style={styles.inputContainer}>
-                <TextInput
-                  style={styles.input}
-                  value={localFullName}
-                  onChangeText={setLocalFullName}
-                  placeholder="Enter your full name"
-                  placeholderTextColor={AIColors.textMuted}
-                  autoCapitalize="words"
-                />
-              </View>
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>EMAIL (OPTIONAL)</Text>
-              <View style={styles.inputContainer}>
-                <TextInput
-                  style={styles.input}
-                  value={localEmail}
-                  onChangeText={setLocalEmail}
-                  placeholder="Enter your email"
-                  placeholderTextColor={AIColors.textMuted}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                />
-              </View>
-            </View>
-          </Animated.View>
-        );
-
-      case 2:
-        return (
-          <Animated.View
-            style={[styles.stepContent, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}
-          >
-            <View style={styles.stepHeader}>
-              <Text style={styles.stepIcon}>02</Text>
-              <Text style={styles.stepTitle}>I am a...</Text>
-              <Text style={styles.stepSubtitle}>This helps us personalize your experience</Text>
-            </View>
-
-            <View style={styles.optionsContainer}>
-              {userTypes.map((item) => (
-                <TouchableOpacity
-                  key={item.type}
-                  style={[
-                    styles.optionCard,
-                    localUserType === item.type && styles.optionCardSelected,
-                  ]}
-                  onPress={() => setLocalUserType(item.type)}
-                  activeOpacity={0.8}
-                >
-                  <View style={[
-                    styles.optionIcon,
-                    localUserType === item.type && styles.optionIconSelected
-                  ]}>
-                    <Text style={styles.optionEmoji}>{item.icon}</Text>
-                  </View>
-                  <View style={styles.optionContent}>
-                    <Text style={[
-                      styles.optionTitle,
-                      localUserType === item.type && styles.optionTitleSelected
-                    ]}>
-                      {UserTypeLabels[item.type]}
-                    </Text>
-                    <Text style={styles.optionDescription}>{item.description}</Text>
-                  </View>
-                  <View style={[
-                    styles.radioOuter,
-                    localUserType === item.type && styles.radioOuterSelected
-                  ]}>
-                    {localUserType === item.type && <View style={styles.radioInner} />}
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </Animated.View>
-        );
-
-      case 3:
-        return (
-          <Animated.View
-            style={[styles.stepContent, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}
-          >
-            <View style={styles.stepHeader}>
-              <Text style={styles.stepIcon}>03</Text>
-              <Text style={styles.stepTitle}>Monthly Income</Text>
-              <Text style={styles.stepSubtitle}>Help us recommend budgets tailored to you</Text>
-            </View>
-
-            <View style={styles.incomeInputContainer}>
-              <View style={styles.currencyBadge}>
-                <Text style={styles.currencySymbol}>₹</Text>
-              </View>
-              <TextInput
-                style={styles.incomeInput}
-                value={localMonthlyIncome}
-                onChangeText={setLocalMonthlyIncome}
-                placeholder="0"
-                placeholderTextColor={AIColors.textMuted}
-                keyboardType="numeric"
+          <View style={styles.chipWrap}>
+            {userTypeChoices.map((item) => (
+              <Chip
+                key={item}
+                label={UserTypeLabels[item]}
+                selected={localUserType === item}
+                onPress={() => setLocalUserType(item)}
               />
-              <Text style={styles.incomeUnit}>/month</Text>
-            </View>
+            ))}
+          </View>
 
-            <View style={styles.incomeHints}>
-              {['25,000', '50,000', '1,00,000', '2,00,000'].map((amount) => (
-                <TouchableOpacity
-                  key={amount}
-                  style={styles.incomeHint}
-                  onPress={() => setLocalMonthlyIncome(amount.replace(/,/g, ''))}
-                >
-                  <Text style={styles.incomeHintText}>₹{amount}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </Animated.View>
-        );
+          <Text style={styles.fieldLabel}>Employment type</Text>
+          <View style={styles.chipWrap}>
+            {employmentChoices.map((item) => (
+              <Chip
+                key={item.value}
+                label={item.label}
+                selected={localEmploymentType === item.value}
+                onPress={() => setLocalEmploymentType(item.value)}
+              />
+            ))}
+          </View>
 
-      case 4:
-        return (
-          <Animated.View
-            style={[styles.stepContent, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}
-          >
-            <View style={styles.stepHeader}>
-              <Text style={styles.stepIcon}>04</Text>
-              <Text style={styles.stepTitle}>Risk Tolerance</Text>
-              <Text style={styles.stepSubtitle}>How comfortable are you with investment risks?</Text>
-            </View>
+          <Text style={styles.fieldLabel}>Household size</Text>
+          <View style={styles.chipWrap}>
+            {householdSizeChoices.map((count) => (
+              <Chip
+                key={count}
+                label={`${count}`}
+                selected={localHouseholdSize === count}
+                onPress={() => setLocalHouseholdSize(count)}
+              />
+            ))}
+          </View>
 
-            <View style={styles.optionsContainer}>
-              {riskLevels.map((item) => (
-                <TouchableOpacity
-                  key={item.level}
-                  style={[
-                    styles.optionCard,
-                    localRiskTolerance === item.level && styles.optionCardSelected,
-                  ]}
-                  onPress={() => setLocalRiskTolerance(item.level)}
-                  activeOpacity={0.8}
-                >
-                  <View style={[
-                    styles.optionIcon,
-                    localRiskTolerance === item.level && styles.optionIconSelected
-                  ]}>
-                    <Text style={styles.optionEmoji}>{item.icon}</Text>
-                  </View>
-                  <View style={styles.optionContent}>
-                    <Text style={[
-                      styles.optionTitle,
-                      localRiskTolerance === item.level && styles.optionTitleSelected
-                    ]}>
-                      {RiskToleranceLabels[item.level]}
-                    </Text>
-                    <Text style={styles.optionDescription}>{item.description}</Text>
-                  </View>
-                  <View style={[
-                    styles.radioOuter,
-                    localRiskTolerance === item.level && styles.radioOuterSelected
-                  ]}>
-                    {localRiskTolerance === item.level && <View style={styles.radioInner} />}
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </Animated.View>
-        );
+          <Text style={styles.fieldLabel}>Housing</Text>
+          <View style={styles.chipWrap}>
+            {housingChoices.map((item) => (
+              <Chip
+                key={item.value}
+                label={item.label}
+                selected={localHousingStatus === item.value}
+                onPress={() => setLocalHousingStatus(item.value)}
+              />
+            ))}
+          </View>
+        </>
+      );
     }
+
+    if (step === 3) {
+      return (
+        <>
+          <Text style={styles.questionTitle}>Tell us about your monthly cash flow</Text>
+          <Text style={styles.questionSubtitle}>Ranges are enough. We avoid unnecessary precision.</Text>
+
+          <Text style={styles.fieldLabel}>Income range</Text>
+          <View style={styles.chipWrap}>
+            {incomeRangeChoices.map((item) => (
+              <Chip
+                key={item.value}
+                label={item.label}
+                selected={localIncomeRange === item.value}
+                onPress={() => {
+                  setLocalIncomeRange(item.value);
+                  setLocalMonthlyIncome(item.monthlyIncomeHint);
+                }}
+              />
+            ))}
+          </View>
+
+          <Text style={styles.fieldLabel}>Approx monthly income (optional exact)</Text>
+          <TextInput
+            style={styles.input}
+            value={localMonthlyIncome}
+            onChangeText={setLocalMonthlyIncome}
+            keyboardType="numeric"
+            placeholder="e.g. 40000"
+            placeholderTextColor={AIColors.textMuted}
+          />
+
+          <Text style={styles.fieldLabel}>Is your income regular?</Text>
+          <View style={styles.chipWrap}>
+            {yesNoChoices.map((item) => (
+              <Chip
+                key={`income-${String(item.value)}`}
+                label={item.label}
+                selected={localIncomeRegular === item.value}
+                onPress={() => setLocalIncomeRegular(item.value)}
+              />
+            ))}
+          </View>
+
+          <Text style={styles.fieldLabel}>Do you have a bank account?</Text>
+          <View style={styles.chipWrap}>
+            {yesNoChoices.map((item) => (
+              <Chip
+                key={`bank-${String(item.value)}`}
+                label={item.label}
+                selected={localHasBankAccount === item.value}
+                onPress={() => setLocalHasBankAccount(item.value)}
+              />
+            ))}
+          </View>
+
+          <Text style={styles.fieldLabel}>Number of earning members</Text>
+          <View style={styles.chipWrap}>
+            {earningMemberChoices.map((count) => (
+              <Chip
+                key={count}
+                label={`${count}`}
+                selected={localEarningMembers === count}
+                onPress={() => setLocalEarningMembers(count)}
+              />
+            ))}
+          </View>
+        </>
+      );
+    }
+
+    if (step === 4) {
+      return (
+        <>
+          <Text style={styles.questionTitle}>Assets and protection snapshot</Text>
+          <Text style={styles.questionSubtitle}>These answers improve net-worth and safety-net recommendations.</Text>
+
+          <Text style={styles.fieldLabel}>Do you own agricultural land?</Text>
+          <View style={styles.chipWrap}>
+            {yesNoChoices.map((item) => (
+              <Chip
+                key={`land-${String(item.value)}`}
+                label={item.label}
+                selected={localHasLand === item.value}
+                onPress={() => setLocalHasLand(item.value)}
+              />
+            ))}
+          </View>
+
+          <Text style={styles.fieldLabel}>Do you have life insurance?</Text>
+          <View style={styles.chipWrap}>
+            {yesNoChoices.map((item) => (
+              <Chip
+                key={`life-${String(item.value)}`}
+                label={item.label}
+                selected={localHasLifeInsurance === item.value}
+                onPress={() => setLocalHasLifeInsurance(item.value)}
+              />
+            ))}
+          </View>
+
+          <Text style={styles.fieldLabel}>Do you have health insurance?</Text>
+          <View style={styles.chipWrap}>
+            {yesNoChoices.map((item) => (
+              <Chip
+                key={`health-${String(item.value)}`}
+                label={item.label}
+                selected={localHasHealthInsurance === item.value}
+                onPress={() => setLocalHasHealthInsurance(item.value)}
+              />
+            ))}
+          </View>
+        </>
+      );
+    }
+
+    return (
+      <>
+        <Text style={styles.questionTitle}>What are your top goals?</Text>
+        <Text style={styles.questionSubtitle}>Choose at least one, and we will prioritize your next actions around it.</Text>
+
+        <View style={styles.chipWrap}>
+          {Object.values(FinancialGoal).map((goal) => (
+            <Chip
+              key={goal}
+              label={FinancialGoalLabels[goal]}
+              selected={localGoals.includes(goal)}
+              onPress={() => toggleGoal(goal)}
+            />
+          ))}
+        </View>
+
+        <Text style={styles.fieldLabel}>Risk comfort</Text>
+        <View style={styles.chipWrap}>
+          {Object.values(RiskTolerance).map((risk) => (
+            <Chip
+              key={risk}
+              label={RiskToleranceLabels[risk]}
+              selected={localRiskTolerance === risk}
+              onPress={() => setLocalRiskTolerance(risk)}
+            />
+          ))}
+        </View>
+      </>
+    );
   };
 
   return (
     <View style={styles.container}>
-      {/* Background Grid */}
-      <View style={styles.gridPattern}>
-        {[...Array(15)].map((_, i) => (
-          <View key={`h-${i}`} style={[styles.gridLine, styles.gridHorizontal, { top: i * 60 }]} />
-        ))}
-      </View>
-
       <SafeAreaView style={styles.safeArea}>
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.keyboardView}
         >
-          {/* Header */}
           <View style={styles.header}>
             <View style={styles.headerTop}>
-              {step > 1 && (
-                <TouchableOpacity style={styles.backButton} onPress={handleBack}>
+              {step > 1 ? (
+                <TouchableOpacity onPress={previousStep} style={styles.backButton}>
                   <Text style={styles.backIcon}>←</Text>
                 </TouchableOpacity>
+              ) : (
+                <View style={styles.backPlaceholder} />
               )}
-              <View style={styles.headerTitles}>
-                <Text style={styles.headerTitle}>Complete Your Profile</Text>
-                <Text style={styles.headerSubtitle}>Help us personalize your experience</Text>
-              </View>
-              <View style={styles.stepBadge}>
-                <Text style={styles.stepBadgeText}>{step}/{totalSteps}</Text>
+              <View style={styles.titleBlock}>
+                <Text style={styles.headerTitle}>Let&apos;s build your profile</Text>
+                <Text style={styles.headerSubtitle}>Step {step} of {TOTAL_STEPS}</Text>
               </View>
             </View>
-
-            <View style={styles.progressContainer}>
-              <ProgressBar progress={progress} color={AIColors.primary} height={4} />
-              <Text style={styles.progressLabel}>
-                {progress === 1 ? 'Complete!' : 'Almost there!'}
-              </Text>
-            </View>
+            <ProgressBar progress={progress} color={AIColors.primary} height={5} />
+            <Text style={styles.unlockText}>{stepUnlockText}</Text>
           </View>
 
-          {/* Content */}
           <ScrollView
-            style={styles.scrollView}
+            style={styles.scroll}
             contentContainerStyle={styles.scrollContent}
-            showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
           >
-            {profileError && (
-              <View style={styles.errorContainer}>
-                <Text style={styles.errorIcon}>!</Text>
+            {profileError ? (
+              <View style={styles.errorBanner}>
                 <Text style={styles.errorText}>{profileError}</Text>
               </View>
-            )}
+            ) : null}
 
-            {renderStep()}
+            <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
+              {renderStepContent()}
+            </Animated.View>
           </ScrollView>
 
-          {/* Footer */}
           <View style={styles.footer}>
             <TouchableOpacity
-              style={[
-                styles.continueButton,
-                !canProceed() && styles.continueButtonDisabled,
-              ]}
-              onPress={handleNext}
-              disabled={!canProceed() || isProfileSaving}
+              style={[styles.continueButton, !canProceed && styles.continueButtonDisabled]}
+              disabled={!canProceed || isProfileSaving}
+              onPress={step < TOTAL_STEPS ? nextStep : handleSubmit}
               activeOpacity={0.85}
             >
               {isProfileSaving ? (
                 <ActivityIndicator color={AIColors.background} size="small" />
               ) : (
-                <>
-                  <Text style={styles.continueButtonText}>
-                    {step === totalSteps ? 'Get Started' : 'Continue'}
-                  </Text>
-                  <Text style={styles.continueButtonIcon}>→</Text>
-                </>
+                <Text style={styles.continueText}>{step < TOTAL_STEPS ? 'Continue' : 'Finish setup'}</Text>
               )}
             </TouchableOpacity>
           </View>
@@ -442,52 +586,39 @@ const styles = StyleSheet.create({
   keyboardView: {
     flex: 1,
   },
-
-  // Grid Pattern
-  gridPattern: {
-    ...StyleSheet.absoluteFillObject,
-    overflow: 'hidden',
-  },
-  gridLine: {
-    position: 'absolute',
-    backgroundColor: AIColors.border,
-  },
-  gridHorizontal: {
-    left: 0,
-    right: 0,
-    height: 1,
-    opacity: 0.2,
-  },
-
-  // Header
   header: {
     paddingHorizontal: AISpacing.xl,
     paddingTop: AISpacing.md,
-    paddingBottom: AISpacing.lg,
+    paddingBottom: AISpacing.md,
     borderBottomWidth: 1,
     borderBottomColor: AIColors.border,
   },
   headerTop: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: AISpacing.lg,
+    marginBottom: AISpacing.sm,
   },
   backButton: {
-    width: 40,
-    height: 40,
+    width: 36,
+    height: 36,
     borderRadius: AIRadius.md,
-    backgroundColor: AIColors.surface,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: AISpacing.md,
     borderWidth: 1,
     borderColor: AIColors.border,
+    backgroundColor: AIColors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: AISpacing.md,
+  },
+  backPlaceholder: {
+    width: 36,
+    height: 36,
+    marginRight: AISpacing.md,
   },
   backIcon: {
-    fontSize: 20,
+    fontSize: 18,
     color: AIColors.text,
   },
-  headerTitles: {
+  titleBlock: {
     flex: 1,
   },
   headerTitle: {
@@ -497,248 +628,100 @@ const styles = StyleSheet.create({
   headerSubtitle: {
     ...AITypography.bodySmall,
     color: AIColors.textSecondary,
-    marginTop: 2,
   },
-  stepBadge: {
-    paddingHorizontal: AISpacing.md,
-    paddingVertical: AISpacing.xs,
-    backgroundColor: AIColors.primaryDim,
-    borderRadius: AIRadius.full,
-  },
-  stepBadgeText: {
-    ...AITypography.label,
-    color: AIColors.primary,
-  },
-  progressContainer: {
-    marginTop: AISpacing.sm,
-  },
-  progressLabel: {
+  unlockText: {
     ...AITypography.labelSmall,
     color: AIColors.primary,
-    textAlign: 'right',
     marginTop: AISpacing.xs,
   },
-
-  // Content
-  scrollView: {
+  scroll: {
     flex: 1,
   },
   scrollContent: {
     paddingHorizontal: AISpacing.xl,
-    paddingVertical: AISpacing.xl,
+    paddingVertical: AISpacing.lg,
+    paddingBottom: 120,
   },
-  stepContent: {
-    flex: 1,
-  },
-  stepHeader: {
-    marginBottom: AISpacing.xl,
-  },
-  stepIcon: {
-    fontSize: 32,
-    marginBottom: AISpacing.sm,
-  },
-  stepTitle: {
-    ...AITypography.h1,
-    color: AIColors.text,
-    marginBottom: AISpacing.xs,
-  },
-  stepSubtitle: {
-    ...AITypography.body,
-    color: AIColors.textSecondary,
-  },
-
-  // Error
-  errorContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  errorBanner: {
     backgroundColor: AIColors.errorDim,
-    padding: AISpacing.md,
-    borderRadius: AIRadius.lg,
-    marginBottom: AISpacing.lg,
+    borderColor: AIColors.error,
     borderWidth: 1,
-    borderColor: 'rgba(239, 68, 68, 0.3)',
-  },
-  errorIcon: {
-    fontSize: 16,
-    marginRight: AISpacing.sm,
+    borderRadius: AIRadius.md,
+    padding: AISpacing.sm,
+    marginBottom: AISpacing.md,
   },
   errorText: {
     ...AITypography.bodySmall,
     color: AIColors.error,
-    flex: 1,
   },
-
-  // Input
-  inputGroup: {
-    marginBottom: AISpacing.lg,
+  questionTitle: {
+    ...AITypography.h1,
+    color: AIColors.text,
+    marginBottom: AISpacing.xs,
   },
-  inputLabel: {
+  questionSubtitle: {
+    ...AITypography.body,
+    color: AIColors.textSecondary,
+    marginBottom: AISpacing.md,
+  },
+  fieldLabel: {
     ...AITypography.label,
     color: AIColors.textSecondary,
-    marginBottom: AISpacing.sm,
-  },
-  inputContainer: {
-    backgroundColor: AIColors.surface,
-    borderRadius: AIRadius.lg,
-    borderWidth: 1.5,
-    borderColor: AIColors.border,
-    paddingHorizontal: AISpacing.md,
+    marginBottom: AISpacing.xs,
+    marginTop: AISpacing.md,
   },
   input: {
-    ...AITypography.bodyLarge,
-    color: AIColors.text,
-    paddingVertical: AISpacing.md,
-  },
-
-  // Options
-  optionsContainer: {
-    gap: AISpacing.sm,
-  },
-  optionCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: AIColors.surface,
-    borderRadius: AIRadius.lg,
-    padding: AISpacing.md,
-    borderWidth: 1.5,
-    borderColor: AIColors.border,
-  },
-  optionCardSelected: {
-    borderColor: AIColors.primary,
-    backgroundColor: AIColors.primaryDim,
-  },
-  optionIcon: {
-    width: 48,
-    height: 48,
     borderRadius: AIRadius.md,
-    backgroundColor: AIColors.surfaceLight,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: AISpacing.md,
-  },
-  optionIconSelected: {
-    backgroundColor: AIColors.primaryDim,
-  },
-  optionEmoji: {
-    fontSize: 24,
-  },
-  optionContent: {
-    flex: 1,
-  },
-  optionTitle: {
-    ...AITypography.body,
-    color: AIColors.text,
-    fontWeight: '600',
-  },
-  optionTitleSelected: {
-    color: AIColors.primary,
-  },
-  optionDescription: {
-    ...AITypography.bodySmall,
-    color: AIColors.textSecondary,
-    marginTop: 2,
-  },
-  radioOuter: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    borderWidth: 2,
+    borderWidth: 1,
     borderColor: AIColors.border,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  radioOuterSelected: {
-    borderColor: AIColors.primary,
-  },
-  radioInner: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: AIColors.primary,
-  },
-
-  // Income Input
-  incomeInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
     backgroundColor: AIColors.surface,
-    borderRadius: AIRadius.xl,
-    borderWidth: 1.5,
-    borderColor: AIColors.border,
+    color: AIColors.text,
     paddingHorizontal: AISpacing.md,
     paddingVertical: AISpacing.sm,
-  },
-  currencyBadge: {
-    width: 40,
-    height: 40,
-    borderRadius: AIRadius.md,
-    backgroundColor: AIColors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: AISpacing.sm,
-  },
-  currencySymbol: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: AIColors.background,
-  },
-  incomeInput: {
-    flex: 1,
-    ...AITypography.displaySmall,
-    color: AIColors.text,
-    paddingVertical: AISpacing.sm,
-  },
-  incomeUnit: {
     ...AITypography.body,
-    color: AIColors.textMuted,
   },
-  incomeHints: {
+  chipWrap: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: AISpacing.sm,
-    marginTop: AISpacing.lg,
+    gap: 8,
   },
-  incomeHint: {
-    paddingHorizontal: AISpacing.md,
-    paddingVertical: AISpacing.sm,
-    backgroundColor: AIColors.surface,
+  chip: {
     borderRadius: AIRadius.full,
     borderWidth: 1,
     borderColor: AIColors.border,
+    backgroundColor: AIColors.surface,
+    paddingHorizontal: AISpacing.md,
+    paddingVertical: 8,
   },
-  incomeHintText: {
-    ...AITypography.bodySmall,
+  chipSelected: {
+    borderColor: AIColors.primary,
+    backgroundColor: AIColors.primaryDim,
+  },
+  chipText: {
+    ...AITypography.labelSmall,
     color: AIColors.textSecondary,
   },
-
-  // Footer
+  chipTextSelected: {
+    color: AIColors.primary,
+  },
   footer: {
-    paddingHorizontal: AISpacing.xl,
-    paddingVertical: AISpacing.lg,
     borderTopWidth: 1,
     borderTopColor: AIColors.border,
+    paddingHorizontal: AISpacing.xl,
+    paddingVertical: AISpacing.md,
   },
   continueButton: {
-    flexDirection: 'row',
+    backgroundColor: AIColors.primary,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: AIColors.primary,
-    paddingVertical: AISpacing.lg,
     borderRadius: AIRadius.lg,
-    ...AIShadows.glow,
+    paddingVertical: 14,
   },
   continueButtonDisabled: {
-    backgroundColor: AIColors.surface,
-    shadowOpacity: 0,
+    opacity: 0.45,
   },
-  continueButtonText: {
+  continueText: {
     ...AITypography.button,
     color: AIColors.background,
-    fontWeight: '600',
-  },
-  continueButtonIcon: {
-    fontSize: 18,
-    color: AIColors.background,
-    marginLeft: AISpacing.sm,
   },
 });

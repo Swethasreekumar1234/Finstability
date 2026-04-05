@@ -65,7 +65,28 @@ interface AuthState {
   updateUserType: (type: UserType) => void;
   updateMonthlyIncome: (income: string) => void;
   updateRiskTolerance: (risk: RiskTolerance) => void;
-  saveProfile: () => Promise<boolean>;
+  saveProfile: (overrides?: {
+    state?: string;
+    city?: string;
+    age?: number;
+    ageBand?: string;
+    employmentType?: string;
+    occupation?: string;
+    householdSize?: number;
+    housingStatus?: string;
+    incomeRange?: string;
+    incomeRegular?: boolean;
+    earningMembers?: number;
+    hasBankAccount?: boolean;
+    hasLand?: boolean;
+    financialGoals?: string[];
+    hasLifeInsurance?: boolean;
+    hasHealthInsurance?: boolean;
+    hasPpf?: boolean;
+    hasFd?: boolean;
+    hasMutualFunds?: boolean;
+    hasGoldInvestments?: boolean;
+  }) => Promise<boolean>;
 
   // User Actions
   loadUserProfile: () => Promise<void>;
@@ -393,7 +414,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ selectedRiskTolerance: risk, profileError: null });
   },
 
-  saveProfile: async () => {
+  saveProfile: async (overrides = {}) => {
     const { 
       fullName, email, selectedUserType, monthlyIncome, 
       selectedRiskTolerance, phoneNumber, firebaseUid 
@@ -444,16 +465,32 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         phone_number: profileData.phoneNumber,
         user_type: profileData.userType,
         risk_tolerance: profileData.riskTolerance,
-        employment_type: 'salaried',
+        employment_type: (overrides.employmentType || 'salaried').toLowerCase(),
         monthly_income: profileData.monthlyIncome,
         monthly_expenses: 0,
         total_savings: 0,
         total_debts: 0,
-        family_size: 1,
-        age: 25,
+        family_size: overrides.householdSize || 1,
+        age: overrides.age || 25,
         gender: 'other',
-        state: 'Delhi',
-        occupation: 'salaried',
+        state: overrides.state || 'Delhi',
+        occupation: overrides.occupation || 'salaried',
+        city: overrides.city,
+        age_band: overrides.ageBand,
+        household_size: overrides.householdSize || 1,
+        housing_status: overrides.housingStatus,
+        income_range: overrides.incomeRange,
+        income_regular: overrides.incomeRegular,
+        earning_members: overrides.earningMembers,
+        has_bank_account: overrides.hasBankAccount,
+        has_land: overrides.hasLand,
+        financial_goals: overrides.financialGoals,
+        has_life_insurance: overrides.hasLifeInsurance,
+        has_health_insurance: overrides.hasHealthInsurance,
+        has_ppf: overrides.hasPpf,
+        has_fd: overrides.hasFd,
+        has_mutual_funds: overrides.hasMutualFunds,
+        has_gold_investments: overrides.hasGoldInvestments,
       });
       
       // Update local state

@@ -14,21 +14,44 @@ class UserProfile(BaseModel):
     risk_tolerance: Optional[str] = None
     firebase_uid: Optional[str] = None
     age: int = 25
+    age_band: Optional[str] = None  # 18-24 / 25-34 / 35-44 / 45-54 / 55+
     gender: str = "male"          # male / female / other
     state: str = "Delhi"
+    city: Optional[str] = None
     occupation: str = "salaried"
     employment_type: str = "salaried"  # salaried / self_employed / farmer / student / unemployed / retired
+    household_size: int = 1
+    housing_status: Optional[str] = None  # owned / rented / living_with_family / other
     monthly_income: float = 0.0
+    income_range: Optional[str] = None  # e.g. 0-25k, 25k-50k, 50k-1L, 1L+
+    income_regular: Optional[bool] = None
+    earning_members: Optional[int] = None
+    has_bank_account: Optional[bool] = None
     monthly_expenses: float = 0.0
     total_savings: float = 0.0
     total_debts: float = 0.0
     existing_loans: Optional[float] = None
     family_size: int = 1
+    has_life_insurance: Optional[bool] = None
+    has_health_insurance: Optional[bool] = None
+    has_ppf: Optional[bool] = None
+    has_fd: Optional[bool] = None
+    has_mutual_funds: Optional[bool] = None
+    has_gold_investments: Optional[bool] = None
     financial_goals: Optional[List[str]] = None
     investment_experience: Optional[int] = None
     updated_at_client: Optional[str] = None
     has_land: bool = False
     caste_category: Optional[str] = None  # general / obc / sc / st
+
+
+class ProfileSummary(BaseModel):
+    profile_completeness: int
+    profile_layer: str
+    profile_tags: List[str]
+    missing_fields: List[str]
+    unlocked_capabilities: List[str]
+    next_prompt: Optional[str] = None
 
 
 class GovernmentScheme(BaseModel):

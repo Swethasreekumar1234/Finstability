@@ -30,10 +30,10 @@ function scoreLabel(score: number): { label: string; color: string } {
 }
 
 function money(n: number): string {
-  if (n >= 10000000) return '\\u20B9' + (n / 10000000).toFixed(1) + 'Cr';
-  if (n >= 100000) return '\\u20B9' + (n / 100000).toFixed(1) + 'L';
-  if (n >= 1000) return '\\u20B9' + (n / 1000).toFixed(1) + 'K';
-  return '\\u20B9' + n.toFixed(0);
+  if (n >= 10000000) return '\u20B9' + (n / 10000000).toFixed(1) + 'Cr';
+  if (n >= 100000) return '\u20B9' + (n / 100000).toFixed(1) + 'L';
+  if (n >= 1000) return '\u20B9' + (n / 1000).toFixed(1) + 'K';
+  return '\u20B9' + n.toFixed(0);
 }
 
 function buildMetrics(p: FinancialProfile): Metric[] {

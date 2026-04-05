@@ -59,14 +59,23 @@ function backendProfileToFinancialProfile(profile: any): FinancialProfile {
   };
 }
 
+function formatCapabilityLabel(value: string): string {
+  return value.replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
 export default function DashboardScreen() {
   const nav = useNavigation<StackNav>();
-  const { currentUser: user, logout } = useAuthStore();
+  const { currentUser: user, firebaseUid, logout } = useAuthStore();
   const [profile, setProfile] = useState<FinancialProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [schemes, setSchemes] = useState<SchemeRecommendation[]>([]);
   const [tips, setTips] = useState<string[]>([]);
   const [totalBenefits, setTotalBenefits] = useState(0);
+  const [profileCompleteness, setProfileCompleteness] = useState(0);
+  const [profileLayer, setProfileLayer] = useState('Identity & life stage');
+  const [missingFields, setMissingFields] = useState<string[]>([]);
+  const [unlockedCapabilities, setUnlockedCapabilities] = useState<string[]>([]);
+  const [nextPrompt, setNextPrompt] = useState<string | null>(null);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
 
@@ -81,8 +90,25 @@ export default function DashboardScreen() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const profileDoc = user?.email ? await apiService.getProfileByEmail(user.email) : null;
+      const profileDoc = user?.email
+        ? await apiService.getProfileByEmail(user.email)
+        : firebaseUid
+          ? await apiService.getProfileByUserId(firebaseUid)
+          : null;
       const p: FinancialProfile | null = profileDoc ? backendProfileToFinancialProfile(profileDoc) : null;
+      if (profileDoc) {
+        setProfileCompleteness(Number(profileDoc.profile_completeness ?? 0));
+        setProfileLayer(String(profileDoc.profile_layer ?? 'Identity & life stage'));
+        setMissingFields(Array.isArray(profileDoc.missing_fields) ? profileDoc.missing_fields : []);
+        setUnlockedCapabilities(Array.isArray(profileDoc.unlocked_capabilities) ? profileDoc.unlocked_capabilities : []);
+        setNextPrompt(profileDoc.next_prompt ?? null);
+      } else {
+        setProfileCompleteness(0);
+        setProfileLayer('Identity & life stage');
+        setMissingFields([]);
+        setUnlockedCapabilities([]);
+        setNextPrompt(null);
+      }
       setProfile(p);
       if (p && user) {
         const recs = getFinancialRecommendations(user.userType, p.monthlyIncome, p.riskTolerance, p.financialGoals, p);
@@ -133,6 +159,33 @@ export default function DashboardScreen() {
               This app helps you discover financial opportunities. Applications are processed on official external websites.
             </Text>
           </View>
+          {/* Profile completeness */}
+          <View style={st.completenessCard}>
+            <View style={st.completenessRow}>
+              <View>
+                <Text style={st.completenessLabel}>Profile completeness</Text>
+                <Text style={st.completenessValue}>{profileCompleteness}%</Text>
+              </View>
+              <View style={st.completenessRing}>
+                <Text style={st.completenessRingText}>{profileCompleteness}</Text>
+              </View>
+            </View>
+            <View style={st.completenessBarTrack}>
+              <View style={[st.completenessBarFill, { width: `${profileCompleteness}%` }]} />
+            </View>
+            <Text style={st.completenessLayer}>{profileLayer}</Text>
+            {nextPrompt ? <Text style={st.completenessPrompt}>{nextPrompt}</Text> : null}
+            {missingFields.length > 0 ? <Text style={st.completenessMissing}>Missing: {missingFields.slice(0, 3).join(', ')}{missingFields.length > 3 ? '...' : ''}</Text> : null}
+            {unlockedCapabilities.length > 0 && (
+              <View style={st.capabilityWrap}>
+                {unlockedCapabilities.slice(0, 4).map((cap) => (
+                  <View key={cap} style={st.capabilityPill}>
+                    <Text style={st.capabilityText}>{formatCapabilityLabel(cap)}</Text>
+                  </View>
+                ))}
+              </View>
+            )}
+          </View>
           {/* Health Score */}
           <View style={[st.card, { borderColor: AIColors.borderGlow }]}>
             <View style={st.scoreRow}>
@@ -172,7 +225,7 @@ export default function DashboardScreen() {
           {/* Benefits banner */}
           {totalBenefits > 0 && (
             <View style={st.benefitBanner}>
-              <Text style={st.benefitLbl}>Estimated missing benefits</Text>
+              <Text style={st.benefitLbl}>Estimated yearly eligible benefits</Text>
               <Text style={st.benefitVal}>{fmt(totalBenefits)}/yr</Text>
             </View>
           )}
@@ -247,6 +300,20 @@ const st = StyleSheet.create({
   avatarTxt: { ...AITypography.h3, color: AIColors.primary },
   notice: { backgroundColor: AIColors.secondaryDim, borderRadius: AIRadius.md, padding: AISpacing.sm, marginBottom: AISpacing.md, borderLeftWidth: 3, borderLeftColor: AIColors.secondary },
   noticeTxt: { ...AITypography.bodySmall, color: AIColors.textSecondary },
+  completenessCard: { backgroundColor: AIColors.surface, borderRadius: AIRadius.xl, padding: AISpacing.md, marginBottom: AISpacing.md, borderWidth: 1, borderColor: AIColors.borderGlow, ...AIShadows.md },
+  completenessRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  completenessLabel: { ...AITypography.labelSmall, color: AIColors.textMuted, marginBottom: 2 },
+  completenessValue: { ...AITypography.h1, color: AIColors.primary },
+  completenessRing: { width: 54, height: 54, borderRadius: 27, borderWidth: 4, borderColor: AIColors.primary, alignItems: 'center', justifyContent: 'center' },
+  completenessRingText: { ...AITypography.label, color: AIColors.primary },
+  completenessBarTrack: { height: 8, borderRadius: 999, backgroundColor: AIColors.backgroundSecondary, marginTop: 12, overflow: 'hidden' },
+  completenessBarFill: { height: 8, borderRadius: 999, backgroundColor: AIColors.primary },
+  completenessLayer: { ...AITypography.labelSmall, color: AIColors.textSecondary, marginTop: 10 },
+  completenessPrompt: { ...AITypography.bodySmall, color: AIColors.textSecondary, marginTop: 6 },
+  completenessMissing: { ...AITypography.bodySmall, color: AIColors.textMuted, marginTop: 6 },
+  capabilityWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 },
+  capabilityPill: { backgroundColor: AIColors.backgroundSecondary, borderWidth: 1, borderColor: AIColors.border, borderRadius: AIRadius.full, paddingHorizontal: AISpacing.sm, paddingVertical: 4 },
+  capabilityText: { ...AITypography.labelSmall, color: AIColors.textSecondary },
   card: { backgroundColor: AIColors.surface, borderRadius: AIRadius.xl, padding: AISpacing.lg, marginBottom: AISpacing.md, borderWidth: 1, borderColor: AIColors.border, ...AIShadows.md },
   scoreRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   scoreLbl: { ...AITypography.label, color: AIColors.textSecondary, marginBottom: 4 },

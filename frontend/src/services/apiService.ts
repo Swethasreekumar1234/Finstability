@@ -34,6 +34,26 @@ export interface BackendProfile {
   updated_at_client?: string;
   family_size: number;
   has_land?: boolean;
+  age_band?: string;
+  city?: string;
+  household_size?: number;
+  housing_status?: string;
+  income_range?: string;
+  income_regular?: boolean;
+  earning_members?: number;
+  has_bank_account?: boolean;
+  has_life_insurance?: boolean;
+  has_health_insurance?: boolean;
+  has_ppf?: boolean;
+  has_fd?: boolean;
+  has_mutual_funds?: boolean;
+  has_gold_investments?: boolean;
+  profile_completeness?: number;
+  profile_layer?: string;
+  profile_tags?: string[];
+  missing_fields?: string[];
+  unlocked_capabilities?: string[];
+  next_prompt?: string | null;
 }
 
 export interface BackendScheme {
@@ -172,6 +192,16 @@ export const apiService = {
     try {
       const query = encodeURIComponent(email.trim().toLowerCase());
       return await get<BackendProfile>(`/profile/by-email?email=${query}`);
+    } catch {
+      return null;
+    }
+  },
+
+  async getProfileByUserId(userId: string): Promise<BackendProfile | null> {
+    try {
+      const id = encodeURIComponent(userId.trim());
+      if (!id) return null;
+      return await get<BackendProfile>(`/profile/${id}`);
     } catch {
       return null;
     }

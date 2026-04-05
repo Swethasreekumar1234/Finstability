@@ -39,10 +39,10 @@ type Props = {
 };
 
 function money(n: number): string {
-  if (n >= 10000000) return '\\u20B9' + (n / 10000000).toFixed(1) + 'Cr';
-  if (n >= 100000) return '\\u20B9' + (n / 100000).toFixed(1) + 'L';
-  if (n >= 1000) return '\\u20B9' + (n / 1000).toFixed(1) + 'K';
-  return '\\u20B9' + n.toFixed(0);
+  if (n >= 10000000) return '\u20B9' + (n / 10000000).toFixed(1) + 'Cr';
+  if (n >= 100000) return '\u20B9' + (n / 100000).toFixed(1) + 'L';
+  if (n >= 1000) return '\u20B9' + (n / 1000).toFixed(1) + 'K';
+  return '\u20B9' + n.toFixed(0);
 }
 
 const EMPLOYMENT_OPTIONS = [
@@ -75,7 +75,11 @@ export default function FinancialInputScreen({ navigation, route }: Props) {
   useEffect(() => {
     const loadProfile = async () => {
       try {
-        const profile = currentUser?.email ? await apiService.getProfileByEmail(currentUser.email) : null;
+        const profile = currentUser?.email
+          ? await apiService.getProfileByEmail(currentUser.email)
+          : firebaseUid
+            ? await apiService.getProfileByUserId(firebaseUid)
+            : null;
         if (profile) {
           setMonthlyIncome(String(profile.monthly_income ?? 0));
           setMonthlyExpenses(String(profile.monthly_expenses ?? 0));
@@ -92,7 +96,7 @@ export default function FinancialInputScreen({ navigation, route }: Props) {
     };
 
     void loadProfile();
-  }, [currentUser?.email]);
+  }, [currentUser?.email, firebaseUid]);
 
   const completion = useMemo(() => {
     let done = 0;

@@ -24,10 +24,10 @@ import { GridBackdrop, ScreenHeader } from '../components/ui';
 const FINANCIAL_PROFILE_KEY = 'financial_profile';
 
 function money(v: number): string {
-  if (v >= 10000000) return '\\u20B9' + (v / 10000000).toFixed(1) + 'Cr';
-  if (v >= 100000) return '\\u20B9' + (v / 100000).toFixed(1) + 'L';
-  if (v >= 1000) return '\\u20B9' + (v / 1000).toFixed(1) + 'K';
-  return '\\u20B9' + v.toFixed(0);
+  if (v >= 10000000) return '\u20B9' + (v / 10000000).toFixed(1) + 'Cr';
+  if (v >= 100000) return '\u20B9' + (v / 100000).toFixed(1) + 'L';
+  if (v >= 1000) return '\u20B9' + (v / 1000).toFixed(1) + 'K';
+  return '\u20B9' + v.toFixed(0);
 }
 
 function toBackendProfile(profile: FinancialProfile | null) {
