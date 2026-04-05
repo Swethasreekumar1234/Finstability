@@ -5,7 +5,7 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator, Linking, ScrollView, StyleSheet,
-  Text, TouchableOpacity, View,
+  Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -19,6 +19,7 @@ import { useAuthStore } from '../store/authStore';
 import { nextProfilePrompt, applyPromptAnswerToPayload } from '../utils/profilePrompts';
 
 const PROFILE_KEY = 'financial_profile';
+const OTHER_OCCUPATION_VALUE = '__other__';
 
 const CATEGORIES = ['All', 'subsidy', 'pension', 'insurance', 'grant', 'loan_support', 'scholarship'];
 
@@ -109,6 +110,8 @@ export default function BenefitsScreen() {
   const [profileDoc, setProfileDoc] = useState<BackendProfile | null>(null);
   const [promptDismissed, setPromptDismissed] = useState(false);
   const [savingPrompt, setSavingPrompt] = useState(false);
+  const [customOccupationSubtype, setCustomOccupationSubtype] = useState('');
+  const [showCustomOccupationInput, setShowCustomOccupationInput] = useState(false);
 
   useFocusEffect(useCallback(() => {
     loadSchemes();
@@ -118,6 +121,16 @@ export default function BenefitsScreen() {
     if (promptDismissed) return null;
     return nextProfilePrompt(profileDoc);
   }, [promptDismissed, profileDoc]);
+
+  const handleCustomPromptVisibility = (value: string | boolean | number) => {
+    if (prompt?.key === 'occupation_subtype' && value === OTHER_OCCUPATION_VALUE) {
+      setShowCustomOccupationInput(true);
+      return true;
+    }
+    setShowCustomOccupationInput(false);
+    setCustomOccupationSubtype('');
+    return false;
+  };
 
   const loadSchemes = async () => {
     setLoading(true);
@@ -218,6 +231,7 @@ export default function BenefitsScreen() {
 
   const handlePromptAnswer = async (value: string | boolean | number) => {
     if (!profileDoc || !prompt || savingPrompt) return;
+    if (handleCustomPromptVisibility(value)) return;
 
     const resolvedEmail = String(profileDoc.email || currentUser?.email || '').trim().toLowerCase();
     const resolvedUserId = String(profileDoc.user_id || profileDoc.firebase_uid || firebaseUid || `email:${resolvedEmail}`);
@@ -301,6 +315,7 @@ export default function BenefitsScreen() {
     };
 
     applyPromptAnswerToPayload(payload, prompt, value);
+    setProfileDoc(payload);
 
     setSavingPrompt(true);
     try {
@@ -309,6 +324,12 @@ export default function BenefitsScreen() {
     } finally {
       setSavingPrompt(false);
     }
+  };
+
+  const submitCustomOccupationSubtype = async () => {
+    const normalized = customOccupationSubtype.trim().toLowerCase().replace(/\s+/g, '_');
+    if (!normalized) return;
+    await handlePromptAnswer(normalized);
   };
 
   if (loading) {
@@ -357,6 +378,26 @@ export default function BenefitsScreen() {
                 </TouchableOpacity>
               ))}
             </View>
+            {prompt.key === 'occupation_subtype' && showCustomOccupationInput && (
+              <View style={st.promptCustomWrap}>
+                <TextInput
+                  style={st.promptCustomInput}
+                  value={customOccupationSubtype}
+                  onChangeText={setCustomOccupationSubtype}
+                  placeholder="Type your occupation subtype"
+                  placeholderTextColor={AIColors.textMuted}
+                  editable={!savingPrompt}
+                  autoCapitalize="words"
+                />
+                <TouchableOpacity
+                  style={[st.promptCustomBtn, (!customOccupationSubtype.trim() || savingPrompt) && st.promptCustomBtnDisabled]}
+                  onPress={() => void submitCustomOccupationSubtype()}
+                  disabled={!customOccupationSubtype.trim() || savingPrompt}
+                >
+                  <Text style={st.promptCustomBtnText}>Save</Text>
+                </TouchableOpacity>
+              </View>
+            )}
             <TouchableOpacity onPress={() => setPromptDismissed(true)} disabled={savingPrompt}>
               <Text style={st.promptSkip}>{savingPrompt ? 'Saving...' : 'Skip for now'}</Text>
             </TouchableOpacity>
@@ -492,6 +533,25 @@ const st = StyleSheet.create({
     paddingVertical: 7,
   },
   promptChipText: { ...AITypography.label, color: AIColors.textSecondary },
+  promptCustomWrap: { marginBottom: AISpacing.sm, gap: AISpacing.sm },
+  promptCustomInput: {
+    borderWidth: 1,
+    borderColor: AIColors.border,
+    borderRadius: AIRadius.md,
+    backgroundColor: AIColors.backgroundSecondary,
+    color: AIColors.text,
+    paddingHorizontal: AISpacing.md,
+    paddingVertical: 10,
+  },
+  promptCustomBtn: {
+    alignSelf: 'flex-start',
+    backgroundColor: AIColors.primary,
+    borderRadius: AIRadius.md,
+    paddingHorizontal: AISpacing.md,
+    paddingVertical: 8,
+  },
+  promptCustomBtnDisabled: { opacity: 0.5 },
+  promptCustomBtnText: { ...AITypography.label, color: AIColors.background },
   promptSkip: { ...AITypography.bodySmall, color: AIColors.primary },
   filterRow: { marginBottom: AISpacing.sm },
   filterChip: { paddingHorizontal: AISpacing.md, paddingVertical: 7, borderRadius: AIRadius.full, borderWidth: 1, borderColor: AIColors.border, marginRight: AISpacing.sm, backgroundColor: AIColors.surfaceLight },

@@ -58,6 +58,7 @@ const EMPLOYMENT_OPTIONS = [
 
 const RISK_OPTIONS = [RiskTolerance.LOW, RiskTolerance.MODERATE, RiskTolerance.HIGH];
 const GOAL_OPTIONS = Object.values(FinancialGoal);
+const OTHER_OCCUPATION_VALUE = '__other__';
 
 export default function FinancialInputScreen({ navigation, route }: Props) {
   const { currentUser, firebaseUid, loadUserProfile } = useAuthStore();
@@ -75,6 +76,8 @@ export default function FinancialInputScreen({ navigation, route }: Props) {
   const [goals, setGoals] = useState<FinancialGoal[]>([]);
   const [profileDoc, setProfileDoc] = useState<BackendProfile | null>(null);
   const [savingPrompt, setSavingPrompt] = useState(false);
+  const [customOccupationSubtype, setCustomOccupationSubtype] = useState('');
+  const [showCustomOccupationInput, setShowCustomOccupationInput] = useState(false);
 
   useEffect(() => {
     const loadProfile = async () => {
@@ -119,8 +122,23 @@ export default function FinancialInputScreen({ navigation, route }: Props) {
 
   const profilePrompt = useMemo(() => nextProfilePrompt(profileDoc), [profileDoc]);
 
+  useEffect(() => {
+    if (profilePrompt?.key !== 'occupation_subtype') {
+      setShowCustomOccupationInput(false);
+      setCustomOccupationSubtype('');
+    }
+  }, [profilePrompt?.key]);
+
   const handleProfilePromptAnswer = async (value: string | boolean | number) => {
     if (!profileDoc || !profilePrompt || savingPrompt) return;
+
+    if (profilePrompt.key === 'occupation_subtype' && value === OTHER_OCCUPATION_VALUE) {
+      setShowCustomOccupationInput(true);
+      return;
+    }
+
+    setShowCustomOccupationInput(false);
+    setCustomOccupationSubtype('');
 
     const resolvedEmail = String(profileDoc.email || currentUser?.email || '').trim().toLowerCase();
     const resolvedUserId = String(profileDoc.user_id || profileDoc.firebase_uid || firebaseUid || `email:${resolvedEmail}`);
@@ -144,6 +162,7 @@ export default function FinancialInputScreen({ navigation, route }: Props) {
     };
 
     applyPromptAnswerToPayload(payload, profilePrompt, value);
+    setProfileDoc(payload);
 
     setSavingPrompt(true);
     try {
@@ -155,6 +174,12 @@ export default function FinancialInputScreen({ navigation, route }: Props) {
     } finally {
       setSavingPrompt(false);
     }
+  };
+
+  const submitCustomOccupationSubtype = async () => {
+    const normalized = customOccupationSubtype.trim().toLowerCase().replace(/\s+/g, '_');
+    if (!normalized) return;
+    await handleProfilePromptAnswer(normalized);
   };
 
   const save = async () => {
@@ -421,6 +446,26 @@ export default function FinancialInputScreen({ navigation, route }: Props) {
                     </TouchableOpacity>
                   ))}
                 </View>
+                {profilePrompt.key === 'occupation_subtype' && showCustomOccupationInput && (
+                  <View style={styles.customPromptWrap}>
+                    <TextInput
+                      style={styles.input}
+                      value={customOccupationSubtype}
+                      onChangeText={setCustomOccupationSubtype}
+                      placeholder="Type your occupation subtype"
+                      placeholderTextColor={AIColors.textMuted}
+                      editable={!savingPrompt}
+                      autoCapitalize="words"
+                    />
+                    <TouchableOpacity
+                      style={[styles.customPromptBtn, (!customOccupationSubtype.trim() || savingPrompt) && styles.btnDisabled]}
+                      onPress={() => void submitCustomOccupationSubtype()}
+                      disabled={!customOccupationSubtype.trim() || savingPrompt}
+                    >
+                      <Text style={styles.primaryText}>Save</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
                 {savingPrompt ? <Text style={styles.helper}>Saving answer...</Text> : null}
               </>
             ) : (
@@ -516,6 +561,14 @@ const styles = StyleSheet.create({
   },
   chipActive: { borderColor: AIColors.primary, backgroundColor: AIColors.primaryDim },
   chipText: { ...AITypography.labelSmall, color: AIColors.textSecondary },
+  customPromptWrap: { marginTop: AISpacing.sm, gap: AISpacing.sm },
+  customPromptBtn: {
+    alignSelf: 'flex-start',
+    backgroundColor: AIColors.primary,
+    borderRadius: AIRadius.md,
+    paddingHorizontal: AISpacing.md,
+    paddingVertical: 8,
+  },
   chipTextActive: { color: AIColors.primary },
   sliderValue: { ...AITypography.displaySmall, color: AIColors.primary, marginBottom: 4 },
   navRow: { flexDirection: 'row', gap: AISpacing.sm },

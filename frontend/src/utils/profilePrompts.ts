@@ -313,6 +313,7 @@ export function nextProfilePrompt(profile: BackendProfile | null): PromptQuestio
         { label: 'MSME owner', value: 'msme_owner' },
         { label: 'Unemployed', value: 'unemployed' },
         { label: 'Student', value: 'student' },
+        { label: 'Other (type your own)', value: '__other__' },
       ],
     };
   }

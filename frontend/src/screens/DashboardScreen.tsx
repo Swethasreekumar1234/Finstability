@@ -4,7 +4,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator, Animated, Linking, ScrollView,
-  StyleSheet, Text, TouchableOpacity, View,
+  StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -21,6 +21,7 @@ import { nextProfilePrompt, applyPromptAnswerToPayload } from '../utils/profileP
 
 const PROFILE_KEY = 'financial_profile';
 type StackNav = NativeStackNavigationProp<RootStackParamList>;
+const OTHER_OCCUPATION_VALUE = '__other__';
 
 export function calculateHealthScore(p: FinancialProfile | null): number {
   if (!p) return 0;
@@ -81,6 +82,8 @@ export default function DashboardScreen() {
   const [profileDoc, setProfileDoc] = useState<any | null>(null);
   const [promptDismissed, setPromptDismissed] = useState(false);
   const [savingPrompt, setSavingPrompt] = useState(false);
+  const [customOccupationSubtype, setCustomOccupationSubtype] = useState('');
+  const [showCustomOccupationInput, setShowCustomOccupationInput] = useState(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
 
@@ -161,8 +164,23 @@ export default function DashboardScreen() {
     return nextProfilePrompt(profileDoc);
   }, [promptDismissed, profileDoc]);
 
+  useEffect(() => {
+    if (prompt?.key !== 'occupation_subtype') {
+      setShowCustomOccupationInput(false);
+      setCustomOccupationSubtype('');
+    }
+  }, [prompt?.key]);
+
   const handlePromptAnswer = async (value: string | boolean | number) => {
     if (!profileDoc || !prompt || savingPrompt) return;
+
+    if (prompt.key === 'occupation_subtype' && value === OTHER_OCCUPATION_VALUE) {
+      setShowCustomOccupationInput(true);
+      return;
+    }
+
+    setShowCustomOccupationInput(false);
+    setCustomOccupationSubtype('');
 
     const resolvedEmail = String(profileDoc.email || user?.email || '').trim().toLowerCase();
     const resolvedUserId = String(profileDoc.user_id || profileDoc.firebase_uid || firebaseUid || `email:${resolvedEmail}`);
@@ -245,6 +263,7 @@ export default function DashboardScreen() {
     };
 
     applyPromptAnswerToPayload(payload, prompt, value);
+    setProfileDoc(payload);
 
     setSavingPrompt(true);
     try {
@@ -253,6 +272,12 @@ export default function DashboardScreen() {
     } finally {
       setSavingPrompt(false);
     }
+  };
+
+  const submitCustomOccupationSubtype = async () => {
+    const normalized = customOccupationSubtype.trim().toLowerCase().replace(/\s+/g, '_');
+    if (!normalized) return;
+    await handlePromptAnswer(normalized);
   };
 
   const score = calculateHealthScore(profile);
@@ -304,6 +329,26 @@ export default function DashboardScreen() {
                   </TouchableOpacity>
                 ))}
               </View>
+              {prompt.key === 'occupation_subtype' && showCustomOccupationInput && (
+                <View style={st.promptCustomWrap}>
+                  <TextInput
+                    style={st.promptCustomInput}
+                    value={customOccupationSubtype}
+                    onChangeText={setCustomOccupationSubtype}
+                    placeholder="Type your occupation subtype"
+                    placeholderTextColor={AIColors.textMuted}
+                    editable={!savingPrompt}
+                    autoCapitalize="words"
+                  />
+                  <TouchableOpacity
+                    style={[st.promptCustomBtn, (!customOccupationSubtype.trim() || savingPrompt) && st.promptCustomBtnDisabled]}
+                    onPress={() => void submitCustomOccupationSubtype()}
+                    disabled={!customOccupationSubtype.trim() || savingPrompt}
+                  >
+                    <Text style={st.promptCustomBtnText}>Save</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
               <TouchableOpacity onPress={() => setPromptDismissed(true)} disabled={savingPrompt}>
                 <Text style={st.promptSkip}>{savingPrompt ? 'Saving...' : 'Skip for now'}</Text>
               </TouchableOpacity>
@@ -456,6 +501,25 @@ const st = StyleSheet.create({
   promptOptions: { flexDirection: 'row', flexWrap: 'wrap', gap: AISpacing.sm, marginBottom: AISpacing.sm },
   promptChip: { backgroundColor: AIColors.backgroundSecondary, borderWidth: 1, borderColor: AIColors.border, borderRadius: AIRadius.full, paddingHorizontal: AISpacing.md, paddingVertical: 7 },
   promptChipText: { ...AITypography.label, color: AIColors.textSecondary },
+  promptCustomWrap: { marginBottom: AISpacing.sm, gap: AISpacing.sm },
+  promptCustomInput: {
+    borderWidth: 1,
+    borderColor: AIColors.border,
+    borderRadius: AIRadius.md,
+    backgroundColor: AIColors.backgroundSecondary,
+    color: AIColors.text,
+    paddingHorizontal: AISpacing.md,
+    paddingVertical: 10,
+  },
+  promptCustomBtn: {
+    alignSelf: 'flex-start',
+    backgroundColor: AIColors.primary,
+    borderRadius: AIRadius.md,
+    paddingHorizontal: AISpacing.md,
+    paddingVertical: 8,
+  },
+  promptCustomBtnDisabled: { opacity: 0.5 },
+  promptCustomBtnText: { ...AITypography.label, color: AIColors.background },
   promptSkip: { ...AITypography.bodySmall, color: AIColors.primary },
   completenessCard: { backgroundColor: AIColors.surface, borderRadius: AIRadius.xl, padding: AISpacing.md, marginBottom: AISpacing.md, borderWidth: 1, borderColor: AIColors.borderGlow, ...AIShadows.md },
   completenessRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },

@@ -84,6 +84,8 @@ class UserProfile(BaseModel):
     enrolled_apy: Optional[bool] = None
     enrolled_esic: Optional[bool] = None
     enrolled_epfo: Optional[bool] = None
+    application_history_status: Optional[str] = None
+    benefit_cap_reached: Optional[bool] = None
 
     # --- Documents & History ---
     has_ration_card: Optional[bool] = None
@@ -92,6 +94,7 @@ class UserProfile(BaseModel):
     has_income_certificate: Optional[bool] = None
     has_domicile_certificate: Optional[bool] = None
     has_bank_passbook: Optional[bool] = None
+    has_land: Optional[bool] = None
 
     # --- Investment Data ---
     risk_tolerance: Optional[str] = None
@@ -134,4 +137,74 @@ class EligibleSchemesResponse(BaseModel):
     total_estimated_benefits: float
     missing_benefit_count: int
 
-# ... (Rest of your BenefitEstimate, Investment, and Transaction models)
+class BenefitEstimate(BaseModel):
+    scheme_name: str
+    annual_amount: float
+    category: str
+
+
+class BenefitEstimateResponse(BaseModel):
+    total_estimated_benefits: float
+    breakdown: List[BenefitEstimate]
+
+
+class FundNavDocument(BaseModel):
+    scheme_code: str
+    scheme_name: str
+    isin: str
+    nav: float
+    nav_date: str
+    fetched_at: datetime
+
+
+class FundNavHistoryResponse(BaseModel):
+    scheme_code: str
+    count: int
+    items: List[FundNavDocument]
+
+
+class InvestmentPortfolio(BaseModel):
+    name: str
+    risk_level: str
+    risk_color: str
+    description: str
+    allocation: Dict[str, float]
+    expected_return_min: float
+    expected_return_max: float
+    platforms: List[str]
+    platform_urls: List[str]
+    explanation: str
+    min_monthly_sip: float
+    nav_highlights: List[FundNavDocument] = []
+
+
+class InvestmentRecommendationsResponse(BaseModel):
+    portfolios: List[InvestmentPortfolio]
+    recommended_monthly_investment: float
+    primary_recommendation: str
+    reasoning: str
+    as_of: datetime
+
+
+class TransactionIn(BaseModel):
+    user_id: str
+    date: str
+    amount: float
+    type: Literal["income", "expense"]
+    merchant: str
+    category: Optional[str] = None
+
+
+class BudgetIn(BaseModel):
+    user_id: str
+    category: str
+    monthly_limit: float
+
+
+class MonthlySummaryResponse(BaseModel):
+    total_income: float
+    total_expenses: float
+    savings: float
+    expense_ratio: float
+    category_breakdown: Dict[str, float]
+    alerts: List[str]

@@ -7,15 +7,45 @@ const normalizeBaseUrl = (url: string): string => url.replace(/\/$/, '');
 
 const buildLocalUrl = (host: string): string => `http://${host}:${DEFAULT_BACKEND_PORT}`;
 
-const getHostFromExpo = (): string | null => {
-  const hostUri = Constants.expoConfig?.hostUri || Constants.expoGoConfig?.hostUri;
+const parseHost = (raw?: string | null): string | null => {
+  if (!raw) return null;
+  const normalized = raw.trim();
+  if (!normalized) return null;
 
-  if (!hostUri) {
-    return null;
+  if (normalized.includes('://')) {
+    try {
+      const parsed = new URL(normalized);
+      return parsed.hostname || null;
+    } catch {
+      // Fall through to non-URL parsing.
+    }
   }
 
-  const host = hostUri.split(':')[0]?.trim();
+  const withoutPath = normalized.split('/')[0];
+  const host = withoutPath.split(':')[0]?.trim();
   return host || null;
+};
+
+const getHostFromExpo = (): string | null => {
+  const anyConstants = Constants as any;
+
+  const candidates = [
+    Constants.expoConfig?.hostUri,
+    Constants.expoGoConfig?.hostUri,
+    anyConstants?.manifest?.debuggerHost,
+    anyConstants?.manifest2?.extra?.expoClient?.hostUri,
+    anyConstants?.manifest2?.extra?.expoGo?.debuggerHost,
+    Constants.linkingUri,
+  ];
+
+  for (const candidate of candidates) {
+    const host = parseHost(candidate);
+    if (host) {
+      return host;
+    }
+  }
+
+  return null;
 };
 
 export const getBackendBaseUrl = (): string => {

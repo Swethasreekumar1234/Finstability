@@ -37,34 +37,6 @@ const persistAuthSession = async (session: AuthSession) => {
   await AsyncStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(session));
 };
 
-const loadPersistedAuthSession = async (): Promise<AuthSession | null> => {
-  const rawSession = await AsyncStorage.getItem(AUTH_SESSION_KEY);
-  if (!rawSession) {
-    return null;
-  }
-
-  try {
-    return JSON.parse(rawSession) as AuthSession;
-  } catch {
-    return null;
-  }
-};
-
-const buildLocalUser = (fullName: string, email: string): User => {
-  const displayName = fullName.trim() || email.trim() || 'User';
-
-  return {
-    phoneNumber: '',
-    fullName: displayName,
-    displayName,
-    email,
-    userType: UserType.STUDENT,
-    monthlyIncome: 0,
-    riskTolerance: RiskTolerance.MODERATE,
-    createdAt: Date.now(),
-  };
-};
-
 interface AuthState {
   // Firebase User
   firebaseUid: string | null;
@@ -337,23 +309,18 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         });
       }
 
-      let savedProfile = existingProfile;
-      try {
-        await apiService.saveProfile(profilePayload);
-        savedProfile = await apiService.getProfileByUserId(resolvedUserId)
-          || (normalizedEmail ? await apiService.getProfileByEmail(normalizedEmail) : null)
-          || existingProfile;
-      } catch (syncError: any) {
-        console.warn('Google profile sync failed, continuing with Firebase session:', syncError?.message || syncError);
+      await apiService.saveProfile(profilePayload);
+      const savedProfile = await apiService.getProfileByUserId(resolvedUserId)
+        || (normalizedEmail ? await apiService.getProfileByEmail(normalizedEmail) : null);
+      if (!savedProfile) {
+        throw new Error('Profile sync failed. Please retry once MongoDB is reachable.');
       }
 
-      const currentUser = savedProfile ? backendProfileToUser(savedProfile) : backendProfileToUser(profilePayload);
-      if (savedProfile) {
-        await persistFinancialProfile(savedProfile);
-      }
+      const currentUser = backendProfileToUser(savedProfile);
+      await persistFinancialProfile(savedProfile);
 
-      const resolvedUid = String(savedProfile?.user_id || savedProfile?.firebase_uid || resolvedUserId);
-      const resolvedEmail = normalizeEmail(savedProfile?.email || normalizedEmail);
+      const resolvedUid = String(savedProfile.user_id || savedProfile.firebase_uid || resolvedUserId);
+      const resolvedEmail = normalizeEmail(savedProfile.email || normalizedEmail);
       await persistAuthSession({
         userId: resolvedUid,
         email: resolvedEmail || undefined,
@@ -363,7 +330,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       set({
         firebaseUid: resolvedUid,
         email: resolvedEmail,
-        fullName: user.displayName || user.email || 'User',
+        fullName: currentUser.fullName,
         currentUser,
         isLoggedIn: true,
         isGoogleLoading: false,
@@ -391,39 +358,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     try {
       const profile = await apiService.getProfileByEmail(cleanEmail);
       if (!profile) {
-        const persistedSession = await loadPersistedAuthSession();
-        if (persistedSession && normalizeEmail(persistedSession.email) === cleanEmail) {
-          const fallbackUser = buildLocalUser(persistedSession.fullName || cleanEmail, cleanEmail);
-
-          await persistAuthSession({
-            userId: persistedSession.userId,
-            email: cleanEmail,
-            fullName: persistedSession.fullName || fallbackUser.fullName,
-          });
-
-          set({
-            firebaseUid: persistedSession.userId,
-            email: cleanEmail,
-            fullName: persistedSession.fullName || fallbackUser.fullName,
-            currentUser: fallbackUser,
-            isLoggedIn: true,
-            isGoogleLoading: false,
-          });
-
-          return { success: true };
-        }
-
-        const backendAvailable = await apiService.isAvailable();
         set({
           isGoogleLoading: false,
-          authError: backendAvailable
-            ? 'No account found with this email. Please create your account.'
-            : 'Sync is temporarily unavailable. Please try again once the backend is reachable.',
+          authError: 'No account found with this email. Please create your account.',
         });
-        return {
-          success: false,
-          message: backendAvailable ? 'No account found' : 'Sync temporarily unavailable',
-        };
+        return { success: false, message: 'No account found' };
       }
 
       const userId = String(profile.user_id || profile.firebase_uid || `email:${cleanEmail}`);
@@ -494,34 +433,27 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         total_debts: 0,
         family_size: 1,
       };
-      try {
-        await apiService.saveProfile(profilePayload);
-      } catch (mongoError: any) {
-        console.warn('Backend profile sync failed, continuing with local signup:', mongoError);
+      await apiService.saveProfile(profilePayload);
+
+      const savedProfile = await apiService.getProfileByUserId(userId)
+        || await apiService.getProfileByEmail(cleanEmail);
+      if (!savedProfile) {
+        throw new Error('Profile was not saved in MongoDB. Please retry.');
       }
 
-      await persistFinancialProfile(profilePayload);
+      await persistFinancialProfile(savedProfile);
       await persistAuthSession({
         userId,
         email: cleanEmail,
         fullName: cleanName,
       });
 
-      const newUser: User = {
-        phoneNumber: '',
-        fullName: cleanName,
-        displayName: cleanName,
-        email: cleanEmail,
-        userType: UserType.STUDENT,
-        monthlyIncome: 0,
-        riskTolerance: RiskTolerance.MODERATE,
-        createdAt: Date.now(),
-      };
+      const newUser: User = backendProfileToUser(savedProfile);
 
       set({
-        firebaseUid: userId,
-        email: cleanEmail,
-        fullName: cleanName,
+        firebaseUid: String(savedProfile.user_id || savedProfile.firebase_uid || userId),
+        email: normalizeEmail(savedProfile.email || cleanEmail),
+        fullName: newUser.fullName,
         currentUser: newUser,
         isLoggedIn: true,
         isGoogleLoading: false,
@@ -633,7 +565,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         income_regular: overrides.incomeRegular,
         earning_members: overrides.earningMembers,
         has_bank_account: overrides.hasBankAccount,
-        has_land: overrides.hasLand,
+        owns_land: overrides.hasLand,
         financial_goals: overrides.financialGoals,
         has_life_insurance: overrides.hasLifeInsurance,
         has_health_insurance: overrides.hasHealthInsurance,
@@ -643,28 +575,29 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         has_gold_investments: overrides.hasGoldInvestments,
       };
 
-      try {
-        await apiService.saveProfile(backendProfile);
-      } catch (backendError) {
-        console.warn('Backend profile sync failed, saving locally:', backendError);
+      await apiService.saveProfile(backendProfile);
+      const savedProfile = await apiService.getProfileByUserId(uid)
+        || (normalizeEmail(profileData.email)
+          ? await apiService.getProfileByEmail(normalizeEmail(profileData.email))
+          : null);
+      if (!savedProfile) {
+        throw new Error('Profile save not confirmed in MongoDB.');
       }
 
-      await persistFinancialProfile(backendProfile);
+      await persistFinancialProfile(savedProfile);
       await persistAuthSession({
         userId: uid,
         email: normalizeEmail(profileData.email) || undefined,
-        fullName: profileData.fullName,
+        fullName: savedProfile.display_name || savedProfile.full_name || savedProfile.name || profileData.fullName,
       });
       
       // Update local state
-      const user: User = {
-        ...profileData,
-        createdAt: Date.now(),
-      };
+      const user: User = backendProfileToUser(savedProfile);
       
       set({ 
         firebaseUid: uid,
-        email: normalizeEmail(profileData.email),
+        email: normalizeEmail(savedProfile.email || profileData.email),
+        fullName: user.fullName,
         currentUser: user, 
         isProfileSaving: false, 
         isLoggedIn: true 
@@ -785,10 +718,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         return;
       }
 
+      await AsyncStorage.removeItem(FINANCIAL_PROFILE_KEY);
+      await AsyncStorage.removeItem(AUTH_SESSION_KEY);
       set({
-        firebaseUid: sessionUserId || null,
-        email: sessionEmail,
-        fullName: parsed?.fullName || '',
+        firebaseUid: null,
+        email: '',
+        fullName: '',
+        currentUser: null,
+        isLoggedIn: false,
         isInitialized: true,
       });
       return;
