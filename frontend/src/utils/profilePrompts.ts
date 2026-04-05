@@ -108,8 +108,8 @@ export function nextProfilePrompt(profile: BackendProfile | null): PromptQuestio
   if (profile.age_confirmed !== true || !profile.age) {
     return {
       key: 'age',
-      title: 'Confirm your age range',
-      subtitle: 'Age is used directly in eligibility checks for many schemes.',
+      title: 'Your age',
+      subtitle: 'Helps us match the right schemes.',
       options: [
         { label: '18-24', value: 22 },
         { label: '25-34', value: 30 },
@@ -123,8 +123,8 @@ export function nextProfilePrompt(profile: BackendProfile | null): PromptQuestio
   if (!profile.gender || String(profile.gender).toLowerCase() === 'other') {
     return {
       key: 'gender',
-      title: 'Which gender should we use for scheme matching?',
-      subtitle: 'Some schemes are women-specific or gender-targeted.',
+      title: 'Your gender',
+      subtitle: 'Helps us match the right schemes.',
       options: [
         { label: 'Female', value: 'female' },
         { label: 'Male', value: 'male' },
@@ -136,8 +136,8 @@ export function nextProfilePrompt(profile: BackendProfile | null): PromptQuestio
   if (!profile.caste_category) {
     return {
       key: 'caste_category',
-      title: 'Want more precise scheme matching?',
-      subtitle: 'Some central and state schemes are category-specific.',
+      title: 'Your category',
+      subtitle: 'Helps us match the right schemes.',
       options: [
         { label: 'General', value: 'general' },
         { label: 'OBC', value: 'obc' },
@@ -151,7 +151,7 @@ export function nextProfilePrompt(profile: BackendProfile | null): PromptQuestio
     return {
       key: 'minority_status',
       title: 'Do you belong to a minority community?',
-      subtitle: 'Some welfare schemes are minority-targeted.',
+      subtitle: 'Helps us match the right schemes.',
       options: YES_NO_OPTIONS,
     };
   }
@@ -160,7 +160,7 @@ export function nextProfilePrompt(profile: BackendProfile | null): PromptQuestio
     return {
       key: 'disability_status',
       title: 'Do you have a certified disability?',
-      subtitle: 'This unlocks disability-linked scheme filters.',
+      subtitle: 'Helps us match the right schemes.',
       options: YES_NO_OPTIONS,
     };
   }
@@ -169,7 +169,7 @@ export function nextProfilePrompt(profile: BackendProfile | null): PromptQuestio
     return {
       key: 'disability_percentage',
       title: 'Select your disability percentage range',
-      subtitle: 'Certificate percentage is often used in eligibility.',
+      subtitle: 'Helps us match the right schemes.',
       options: [
         { label: 'Below 40%', value: 30 },
         { label: '40-59%', value: 50 },
@@ -183,7 +183,7 @@ export function nextProfilePrompt(profile: BackendProfile | null): PromptQuestio
     return {
       key: 'marital_status',
       title: 'What is your marital status?',
-      subtitle: 'Widow/single-woman schemes may depend on this.',
+      subtitle: 'Helps us match the right schemes.',
       options: [
         { label: 'Single', value: 'single' },
         { label: 'Married', value: 'married' },
@@ -196,8 +196,8 @@ export function nextProfilePrompt(profile: BackendProfile | null): PromptQuestio
   if (isBlank((profile as any).district)) {
     return {
       key: 'district',
-      title: 'Choose your district tier',
-      subtitle: 'District-level schemes vary by region.',
+      title: 'Your district type',
+      subtitle: 'Helps us match the right schemes.',
       options: [
         { label: 'Metro district', value: 'metro' },
         { label: 'Urban district', value: 'urban_district' },
@@ -210,8 +210,8 @@ export function nextProfilePrompt(profile: BackendProfile | null): PromptQuestio
   if (isBlank((profile as any).urban_rural)) {
     return {
       key: 'urban_rural',
-      title: 'Where do you primarily reside?',
-      subtitle: 'Many schemes are specific to rural or urban households.',
+      title: 'Do you live in urban or rural area?',
+      subtitle: 'Helps us match the right schemes.',
       options: [
         { label: 'Urban', value: 'urban' },
         { label: 'Rural', value: 'rural' },
@@ -222,8 +222,8 @@ export function nextProfilePrompt(profile: BackendProfile | null): PromptQuestio
   if (!Number.isFinite(Number((profile as any).domicile_years))) {
     return {
       key: 'domicile_years',
-      title: 'How long have you lived in this state?',
-      subtitle: 'Some state schemes need residency duration.',
+      title: 'Years in this state',
+      subtitle: 'Helps us match the right schemes.',
       options: [
         { label: 'Less than 1 year', value: 0 },
         { label: '1-3 years', value: 2 },
@@ -237,7 +237,7 @@ export function nextProfilePrompt(profile: BackendProfile | null): PromptQuestio
     return {
       key: 'aspirational_district',
       title: 'Do you live in an aspirational district?',
-      subtitle: 'Some special programs prioritize these districts.',
+      subtitle: 'Helps us match the right schemes.',
       options: YES_NO_OPTIONS,
     };
   }
@@ -246,7 +246,7 @@ export function nextProfilePrompt(profile: BackendProfile | null): PromptQuestio
     return {
       key: 'special_region_flag',
       title: 'Do you belong to a notified special region?',
-      subtitle: 'This can affect eligibility for targeted benefits.',
+      subtitle: 'Helps us match the right schemes.',
       options: YES_NO_OPTIONS,
     };
   }
@@ -255,7 +255,7 @@ export function nextProfilePrompt(profile: BackendProfile | null): PromptQuestio
     return {
       key: 'household_size',
       title: 'How many people are in your household?',
-      subtitle: 'Household composition affects income-linked thresholds.',
+      subtitle: 'Helps us match the right schemes.',
       options: [
         { label: '1', value: 1 },
         { label: '2-3', value: 3 },
@@ -269,7 +269,7 @@ export function nextProfilePrompt(profile: BackendProfile | null): PromptQuestio
     return {
       key: 'dependent_children',
       title: 'How many dependent children are there?',
-      subtitle: 'Important for family- and child-benefit schemes.',
+      subtitle: 'Helps us match the right schemes.',
       options: [
         { label: '0', value: 0 },
         { label: '1', value: 1 },
@@ -283,7 +283,7 @@ export function nextProfilePrompt(profile: BackendProfile | null): PromptQuestio
     return {
       key: 'senior_citizens_in_household',
       title: 'Any senior citizens in your household?',
-      subtitle: 'Helps identify pension and caregiver support schemes.',
+      subtitle: 'Helps us match the right schemes.',
       options: [
         { label: 'None', value: 0 },
         { label: '1', value: 1 },
@@ -296,7 +296,7 @@ export function nextProfilePrompt(profile: BackendProfile | null): PromptQuestio
     return {
       key: 'single_woman_led_household',
       title: 'Is your household single-woman led?',
-      subtitle: 'Certain support schemes prioritize this segment.',
+      subtitle: 'Helps us match the right schemes.',
       options: YES_NO_OPTIONS,
     };
   }
@@ -304,8 +304,8 @@ export function nextProfilePrompt(profile: BackendProfile | null): PromptQuestio
   if (isBlank((profile as any).occupation_subtype)) {
     return {
       key: 'occupation_subtype',
-      title: 'Select your occupation subtype',
-      subtitle: 'This is more precise than just salaried/self-employed.',
+      title: 'Your work type',
+      subtitle: 'Helps us match the right schemes.',
       options: [
         { label: 'Farmer', value: 'farmer' },
         { label: 'Gig worker', value: 'gig_worker' },
@@ -321,8 +321,8 @@ export function nextProfilePrompt(profile: BackendProfile | null): PromptQuestio
   if (isBlank((profile as any).sector)) {
     return {
       key: 'sector',
-      title: 'Which sector best describes your livelihood?',
-      subtitle: 'Sector tags improve grant and subsidy matching.',
+      title: 'Your work sector',
+      subtitle: 'Helps us match the right schemes.',
       options: [
         { label: 'Agriculture', value: 'agri' },
         { label: 'Informal', value: 'informal' },
@@ -336,7 +336,7 @@ export function nextProfilePrompt(profile: BackendProfile | null): PromptQuestio
     return {
       key: 'employment_proof_available',
       title: 'Do you have employment proof documents?',
-      subtitle: 'Salary slips, UDYAM, or similar proof can be required.',
+      subtitle: 'Helps us match the right schemes.',
       options: YES_NO_OPTIONS,
     };
   }
@@ -345,7 +345,7 @@ export function nextProfilePrompt(profile: BackendProfile | null): PromptQuestio
     return {
       key: 'education_level',
       title: 'What is your highest education level?',
-      subtitle: 'Useful for scholarship and skill schemes.',
+      subtitle: 'Helps us match the right schemes.',
       options: [
         { label: 'School', value: 'school' },
         { label: 'Diploma', value: 'diploma' },
@@ -359,7 +359,7 @@ export function nextProfilePrompt(profile: BackendProfile | null): PromptQuestio
     return {
       key: 'student_status',
       title: 'What is your student status?',
-      subtitle: 'Needed for scholarship targeting.',
+      subtitle: 'Helps us match the right schemes.',
       options: [
         { label: 'Not a student', value: 'not_student' },
         { label: 'School student', value: 'school_student' },
@@ -373,7 +373,7 @@ export function nextProfilePrompt(profile: BackendProfile | null): PromptQuestio
     return {
       key: 'institution_type',
       title: 'What type of institution do you attend?',
-      subtitle: 'Institution type is used by many education schemes.',
+      subtitle: 'Helps us match the right schemes.',
       options: [
         { label: 'Government', value: 'government' },
         { label: 'Government-aided', value: 'government_aided' },
@@ -386,7 +386,7 @@ export function nextProfilePrompt(profile: BackendProfile | null): PromptQuestio
     return {
       key: 'course_stream',
       title: 'Which course stream are you in?',
-      subtitle: 'Some scholarships are stream-specific.',
+      subtitle: 'Helps us match the right schemes.',
       options: [
         { label: 'General', value: 'general' },
         { label: 'STEM', value: 'stem' },
@@ -400,7 +400,7 @@ export function nextProfilePrompt(profile: BackendProfile | null): PromptQuestio
     return {
       key: 'has_health_insurance',
       title: 'Do you currently have health insurance?',
-      subtitle: 'This helps avoid recommending overlapping insurance schemes.',
+      subtitle: 'Helps us match the right schemes.',
       options: YES_NO_OPTIONS,
     };
   }
@@ -409,7 +409,7 @@ export function nextProfilePrompt(profile: BackendProfile | null): PromptQuestio
     return {
       key: 'has_life_insurance',
       title: 'Do you currently have life insurance?',
-      subtitle: 'We prioritize uncovered benefit gaps first.',
+      subtitle: 'Helps us match the right schemes.',
       options: YES_NO_OPTIONS,
     };
   }
@@ -417,8 +417,8 @@ export function nextProfilePrompt(profile: BackendProfile | null): PromptQuestio
   if (typeof profile.has_bank_account !== 'boolean') {
     return {
       key: 'has_bank_account',
-      title: 'Do you have an active bank account?',
-      subtitle: 'Many direct-benefit schemes require bank-linked transfers.',
+      title: 'Do you have a bank account?',
+      subtitle: 'Helps us match the right schemes.',
       options: YES_NO_OPTIONS,
     };
   }
@@ -427,7 +427,7 @@ export function nextProfilePrompt(profile: BackendProfile | null): PromptQuestio
     return {
       key: 'jan_dhan_account',
       title: 'Do you have a Jan Dhan account?',
-      subtitle: 'Some DBT benefits are mapped to Jan Dhan accounts.',
+      subtitle: 'Helps us match the right schemes.',
       options: YES_NO_OPTIONS,
     };
   }
@@ -436,7 +436,7 @@ export function nextProfilePrompt(profile: BackendProfile | null): PromptQuestio
     return {
       key: 'has_aadhaar',
       title: 'Do you have Aadhaar?',
-      subtitle: 'Aadhaar is required for many scheme applications.',
+      subtitle: 'Helps us match the right schemes.',
       options: YES_NO_OPTIONS,
     };
   }
@@ -445,7 +445,7 @@ export function nextProfilePrompt(profile: BackendProfile | null): PromptQuestio
     return {
       key: 'has_pan',
       title: 'Do you have PAN?',
-      subtitle: 'PAN can be needed for income-linked schemes.',
+      subtitle: 'Helps us match the right schemes.',
       options: YES_NO_OPTIONS,
     };
   }
@@ -453,8 +453,8 @@ export function nextProfilePrompt(profile: BackendProfile | null): PromptQuestio
   if (typeof profile.has_land !== 'boolean') {
     return {
       key: 'has_land',
-      title: 'Do you own agricultural land?',
-      subtitle: 'This unlocks relevant agriculture support schemes if applicable.',
+      title: 'Do you own farm land?',
+      subtitle: 'Helps us match the right schemes.',
       options: YES_NO_OPTIONS,
     };
   }
@@ -463,7 +463,7 @@ export function nextProfilePrompt(profile: BackendProfile | null): PromptQuestio
     return {
       key: 'landholding_acres',
       title: 'Select your landholding size',
-      subtitle: 'Agriculture schemes often use acreage thresholds.',
+      subtitle: 'Helps us match the right schemes.',
       options: [
         { label: 'Up to 1 acre', value: 1 },
         { label: '1-2 acres', value: 2 },
@@ -477,7 +477,7 @@ export function nextProfilePrompt(profile: BackendProfile | null): PromptQuestio
     return {
       key: 'irrigation_status',
       title: 'What is your irrigation status?',
-      subtitle: 'Irrigation status can affect agri support eligibility.',
+      subtitle: 'Helps us match the right schemes.',
       options: [
         { label: 'Irrigated', value: 'irrigated' },
         { label: 'Rainfed', value: 'rainfed' },
@@ -490,7 +490,7 @@ export function nextProfilePrompt(profile: BackendProfile | null): PromptQuestio
     return {
       key: 'housing_ownership_type',
       title: 'What is your housing ownership type?',
-      subtitle: 'Used for housing support and PMAY recommendations.',
+      subtitle: 'Helps us match the right schemes.',
       options: [
         { label: 'Owned', value: 'owned' },
         { label: 'Rented', value: 'rented' },
@@ -504,7 +504,7 @@ export function nextProfilePrompt(profile: BackendProfile | null): PromptQuestio
     return {
       key: 'pmay_eligible',
       title: 'Do you believe you are PMAY-eligible?',
-      subtitle: 'Used as a quick hint for housing recommendations.',
+      subtitle: 'Helps us match the right schemes.',
       options: YES_NO_OPTIONS,
     };
   }
@@ -513,7 +513,7 @@ export function nextProfilePrompt(profile: BackendProfile | null): PromptQuestio
     return {
       key: 'enrolled_pmjjby',
       title: 'Are you enrolled in PMJJBY?',
-      subtitle: 'Helps avoid duplicate insurance recommendations.',
+      subtitle: 'Helps us match the right schemes.',
       options: YES_NO_OPTIONS,
     };
   }
@@ -522,7 +522,7 @@ export function nextProfilePrompt(profile: BackendProfile | null): PromptQuestio
     return {
       key: 'enrolled_pmsby',
       title: 'Are you enrolled in PMSBY?',
-      subtitle: 'Helps avoid overlap in accidental insurance suggestions.',
+      subtitle: 'Helps us match the right schemes.',
       options: YES_NO_OPTIONS,
     };
   }
@@ -531,7 +531,7 @@ export function nextProfilePrompt(profile: BackendProfile | null): PromptQuestio
     return {
       key: 'enrolled_apy',
       title: 'Are you enrolled in APY?',
-      subtitle: 'Important for pension-related recommendations.',
+      subtitle: 'Helps us match the right schemes.',
       options: YES_NO_OPTIONS,
     };
   }
@@ -540,7 +540,7 @@ export function nextProfilePrompt(profile: BackendProfile | null): PromptQuestio
     return {
       key: 'enrolled_esic',
       title: 'Are you enrolled in ESIC?',
-      subtitle: 'Used for social protection overlap checks.',
+      subtitle: 'Helps us match the right schemes.',
       options: YES_NO_OPTIONS,
     };
   }
@@ -549,7 +549,7 @@ export function nextProfilePrompt(profile: BackendProfile | null): PromptQuestio
     return {
       key: 'enrolled_epfo',
       title: 'Are you enrolled in EPFO?',
-      subtitle: 'Used for pension and social security relevance.',
+      subtitle: 'Helps us match the right schemes.',
       options: YES_NO_OPTIONS,
     };
   }
@@ -558,7 +558,7 @@ export function nextProfilePrompt(profile: BackendProfile | null): PromptQuestio
     return {
       key: 'application_history_status',
       title: 'What is your recent scheme application history?',
-      subtitle: 'Helps prioritize schemes you can apply for now.',
+      subtitle: 'Helps us match the right schemes.',
       options: [
         { label: 'Never applied', value: 'never_applied' },
         { label: 'Applied - pending', value: 'applied_pending' },
@@ -572,7 +572,7 @@ export function nextProfilePrompt(profile: BackendProfile | null): PromptQuestio
     return {
       key: 'benefit_cap_reached',
       title: 'Have you reached any capped subsidy limit recently?',
-      subtitle: 'Avoids recommending capped-out benefits.',
+      subtitle: 'Helps us match the right schemes.',
       options: YES_NO_OPTIONS,
     };
   }
@@ -581,7 +581,7 @@ export function nextProfilePrompt(profile: BackendProfile | null): PromptQuestio
     return {
       key: 'has_ration_card',
       title: 'Do you have a ration card?',
-      subtitle: 'Document readiness boosts instant eligibility.',
+      subtitle: 'Helps us match the right schemes.',
       options: YES_NO_OPTIONS,
     };
   }
@@ -590,7 +590,7 @@ export function nextProfilePrompt(profile: BackendProfile | null): PromptQuestio
     return {
       key: 'has_caste_certificate',
       title: 'Do you have a caste certificate (if applicable)?',
-      subtitle: 'Needed for category-specific schemes.',
+      subtitle: 'Helps us match the right schemes.',
       options: YES_NO_OPTIONS,
     };
   }
@@ -599,7 +599,7 @@ export function nextProfilePrompt(profile: BackendProfile | null): PromptQuestio
     return {
       key: 'has_disability_certificate',
       title: 'Do you have a disability certificate?',
-      subtitle: 'Required for disability-linked schemes.',
+      subtitle: 'Helps us match the right schemes.',
       options: YES_NO_OPTIONS,
     };
   }
@@ -608,7 +608,7 @@ export function nextProfilePrompt(profile: BackendProfile | null): PromptQuestio
     return {
       key: 'has_income_certificate',
       title: 'Do you have an income certificate?',
-      subtitle: 'Income proofs are commonly required.',
+      subtitle: 'Helps us match the right schemes.',
       options: YES_NO_OPTIONS,
     };
   }
@@ -617,7 +617,7 @@ export function nextProfilePrompt(profile: BackendProfile | null): PromptQuestio
     return {
       key: 'has_domicile_certificate',
       title: 'Do you have a domicile certificate?',
-      subtitle: 'Useful for state-scheme applications.',
+      subtitle: 'Helps us match the right schemes.',
       options: YES_NO_OPTIONS,
     };
   }
@@ -626,7 +626,7 @@ export function nextProfilePrompt(profile: BackendProfile | null): PromptQuestio
     return {
       key: 'has_bank_passbook',
       title: 'Do you have a bank passbook copy?',
-      subtitle: 'Speeds up bank-linked scheme applications.',
+      subtitle: 'Helps us match the right schemes.',
       options: YES_NO_OPTIONS,
     };
   }

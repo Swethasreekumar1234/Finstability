@@ -14,9 +14,9 @@ export enum UserType {
 
 export const UserTypeLabels: Record<UserType, string> = {
   [UserType.STUDENT]: 'Student',
-  [UserType.WORKING_PROFESSIONAL]: 'Working Professional',
-  [UserType.RETIREE]: 'Retiree',
-  [UserType.SMALL_BUSINESS_OWNER]: 'Small Business Owner',
+  [UserType.WORKING_PROFESSIONAL]: 'Working person',
+  [UserType.RETIREE]: 'Retired person',
+  [UserType.SMALL_BUSINESS_OWNER]: 'Business owner',
 };
 
 // Risk Tolerance Levels
@@ -27,9 +27,9 @@ export enum RiskTolerance {
 }
 
 export const RiskToleranceLabels: Record<RiskTolerance, string> = {
-  [RiskTolerance.LOW]: 'Conservative',
+  [RiskTolerance.LOW]: 'Low risk',
   [RiskTolerance.MODERATE]: 'Balanced',
-  [RiskTolerance.HIGH]: 'Aggressive',
+  [RiskTolerance.HIGH]: 'High risk',
 };
 
 // Employment Types
@@ -43,8 +43,8 @@ export enum EmploymentType {
 }
 
 export const EmploymentTypeLabels: Record<EmploymentType, string> = {
-  [EmploymentType.FULL_TIME]: 'Full-time Employee',
-  [EmploymentType.PART_TIME]: 'Part-time Employee',
+  [EmploymentType.FULL_TIME]: 'Full-time job',
+  [EmploymentType.PART_TIME]: 'Part-time job',
   [EmploymentType.SELF_EMPLOYED]: 'Self-employed',
   [EmploymentType.FREELANCER]: 'Freelancer',
   [EmploymentType.UNEMPLOYED]: 'Unemployed',
@@ -64,14 +64,14 @@ export enum FinancialGoal {
 }
 
 export const FinancialGoalLabels: Record<FinancialGoal, string> = {
-  [FinancialGoal.EMERGENCY_FUND]: 'Build Emergency Fund',
-  [FinancialGoal.RETIREMENT]: 'Retirement Planning',
+  [FinancialGoal.EMERGENCY_FUND]: 'Emergency savings',
+  [FinancialGoal.RETIREMENT]: 'Retirement',
   [FinancialGoal.HOME_PURCHASE]: 'Buy a Home',
-  [FinancialGoal.DEBT_FREE]: 'Become Debt-free',
-  [FinancialGoal.INVESTMENT]: 'Grow Investments',
-  [FinancialGoal.EDUCATION]: 'Education Fund',
-  [FinancialGoal.TRAVEL]: 'Travel Fund',
-  [FinancialGoal.BUSINESS]: 'Start a Business',
+  [FinancialGoal.DEBT_FREE]: 'Clear debt',
+  [FinancialGoal.INVESTMENT]: 'Grow money',
+  [FinancialGoal.EDUCATION]: 'Education',
+  [FinancialGoal.TRAVEL]: 'Travel',
+  [FinancialGoal.BUSINESS]: 'Start business',
 };
 
 export const FinancialGoalIcons: Record<FinancialGoal, string> = {

@@ -21,13 +21,16 @@ export interface ChatMessage {
 
 function buildSystemPrompt(user: User | null, profile: FinancialProfile | null): string {
   const lines: string[] = [
-    'You are Fin, an expert AI financial advisor specialised in Indian personal finance.',
-    'You give concise, actionable, and empathetic advice in plain English.',
-    'Always consider Indian tax laws, government schemes (PM-JDY, PMAY, NPS, PMKISAN, etc.), and rupee-denominated context.',
-    'Never recommend specific stocks or crypto for investment.',
-    'Keep answers under 200 words unless the user explicitly asks for a detailed explanation.',
-    'Never use markdown tables, never use | characters, never use <br> tags.',
-    'Use plain text with simple numbered lists using - only.',
+    'You are Fin, a money guide for people in India.',
+    'Use very simple English.',
+    'Use short sentences.',
+    'Keep answers under 120 words unless user asks for details.',
+    'Start with one line: In short: ...',
+    'Give 3 to 5 clear steps with - bullets.',
+    'If you use a hard word, explain it in simple words right away.',
+    'Focus on Indian tax rules and government schemes where useful.',
+    'Do not suggest specific stocks or crypto.',
+    'Do not use markdown tables, | characters, or <br> tags.',
     '',
     '## User Profile',
   ];
@@ -108,7 +111,7 @@ export async function sendMessage(
   user: User | null,
   profile: FinancialProfile | null,
 ): Promise<string> {
-  if (!OPENROUTER_API_KEY) return '⚠️ API key not set. Add EXPO_PUBLIC_OPENROUTER_API_KEY to your .env file.';
+  if (!OPENROUTER_API_KEY) return 'AI key is missing. Add EXPO_PUBLIC_OPENROUTER_API_KEY in frontend/.env.';
   const systemPrompt = buildSystemPrompt(user, profile);
   const messages = [
     { role: 'system', content: systemPrompt },
@@ -126,17 +129,17 @@ export async function sendMessage(
 
 export function getSuggestedPrompts(user: User | null): string[] {
   const base = [
-    'How can I improve my financial health score?',
-    'Which government scheme am I eligible for?',
-    'How should I start investing with my income?',
-    'What is the 50-30-20 budgeting rule?',
+    'How can I make my money health better?',
+    'Which government schemes fit me?',
+    'How can I start investing with my salary?',
+    'Explain the 50-30-20 budget in simple words.',
   ];
   if (!user) return base;
   const extra: string[] = [];
-  if (user.userType === 'STUDENT') extra.push('What education loans should I consider?');
-  if (user.userType === 'SMALL_BUSINESS_OWNER') extra.push('How can I get a MUDRA loan?');
-  if (user.userType === 'RETIREE') extra.push('How should I manage my retirement corpus?');
-  if (user.riskTolerance === 'LOW') extra.push('What are the safest investment options in India?');
-  if (user.riskTolerance === 'HIGH') extra.push('How do I start investing in mutual funds via SIP?');
+  if (user.userType === 'STUDENT') extra.push('What student loan options do I have?');
+  if (user.userType === 'SMALL_BUSINESS_OWNER') extra.push('How can I get a MUDRA loan step by step?');
+  if (user.userType === 'RETIREE') extra.push('How should I use my retirement money safely?');
+  if (user.riskTolerance === 'LOW') extra.push('What are low-risk options in India?');
+  if (user.riskTolerance === 'HIGH') extra.push('How do I start a SIP in simple steps?');
   return [...extra, ...base].slice(0, 5);
 }

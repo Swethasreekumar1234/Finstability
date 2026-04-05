@@ -9,6 +9,7 @@ import { useNavigation } from '@react-navigation/native';
 import { useAuthStore } from '../store/authStore';
 import { FinancialProfile } from '../types';
 import { sendMessage, getSuggestedPrompts, ChatMessage } from '../services/OpenrouterService';
+import { SIMPLE_TEXT } from '../utils/textConstants';
 import { AIColors, AISpacing, AIRadius, AITypography } from '../theme/aiTheme';
 import { GridBackdrop } from '../components/ui';
 
@@ -197,9 +198,10 @@ export default function AIChatScreen() {
   }, []);
 
   useEffect(() => {
+    const name = user?.fullName?.split(' ')[0] || 'there';
     setMessages([{
       role: 'model',
-      text: `Hi ${user?.fullName?.split(' ')[0] || 'there'}! 👋 I'm Fin, your AI financial advisor.\n\nAsk me anything about savings, investments, government schemes, budgeting, or loans — I'll give you personalised advice based on your profile.`,
+      text: SIMPLE_TEXT.chat.greeting(name),
     }]);
   }, []);
 
@@ -219,7 +221,7 @@ export default function AIChatScreen() {
       const reply = await sendMessage(trimmed, messages, user ?? null, profile);
       setMessages((prev) => [...prev, { role: 'model', text: reply }]);
     } catch (err: any) {
-      setMessages((prev) => [...prev, { role: 'model', text: `Sorry, something went wrong. Please try again.\n\n_Error: ${err.message}_` }]);
+      setMessages((prev) => [...prev, { role: 'model', text: SIMPLE_TEXT.chat.genericError }]);
     } finally {
       setIsLoading(false);
       scrollToBottom();
@@ -244,7 +246,7 @@ export default function AIChatScreen() {
           </View>
           <View>
             <Text style={styles.headerTitle}>Fin</Text>
-            <Text style={styles.headerSub}>AI Financial Advisor</Text>
+            <Text style={styles.headerSub}>{SIMPLE_TEXT.chat.subtitle}</Text>
           </View>
         </View>
         <View style={styles.geminiBadge}>
@@ -266,7 +268,7 @@ export default function AIChatScreen() {
 
         {messages.filter((m) => m.role === 'user').length === 0 && (
           <View style={styles.suggestionsContainer}>
-            <Text style={styles.suggestionsLabel}>Try asking</Text>
+            <Text style={styles.suggestionsLabel}>{SIMPLE_TEXT.chat.askLabel}</Text>
             <View style={styles.suggestionsRow}>
               {suggestedPrompts.map((p) => (
                 <TouchableOpacity key={p} style={styles.suggestionChip} onPress={() => handleSend(p)} activeOpacity={0.7}>
@@ -280,7 +282,7 @@ export default function AIChatScreen() {
         <View style={styles.inputBar}>
           <TextInput
             style={styles.input}
-            placeholder="Ask Fin anything..."
+            placeholder={SIMPLE_TEXT.chat.placeholder}
             placeholderTextColor={AIColors.textMuted}
             value={inputText}
             onChangeText={setInputText}
