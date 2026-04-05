@@ -20,12 +20,14 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList, OtpState } from '../types';
 import { useAuthStore } from '../store/authStore';
 import { AIColors, AISpacing, AIRadius, AIShadows, AITypography } from '../theme/aiTheme';
+import { useLanguage } from '../i18n/LanguageContext';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'PhoneLogin'>;
 };
 
 export default function PhoneLoginScreen({ navigation }: Props) {
+  const { t } = useLanguage();
   const { 
     phoneNumber: storePhoneNumber,
     updatePhoneNumber: setStorePhone,
@@ -153,9 +155,9 @@ export default function PhoneLoginScreen({ navigation }: Props) {
               <View style={styles.iconContainer}>
                 <Text style={styles.phoneIcon}>◎</Text>
               </View>
-              <Text style={styles.title}>Enter Your Phone</Text>
+              <Text style={styles.title}>{t('auth.phoneTitle')}</Text>
                 <Text style={styles.subtitle}>
-                We&apos;ll send you a verification code to confirm your identity
+                {t('auth.phoneSubtitle')}
               </Text>
             </View>
 
@@ -168,7 +170,7 @@ export default function PhoneLoginScreen({ navigation }: Props) {
                 </View>
               )}
 
-              <Text style={styles.inputLabel}>MOBILE NUMBER</Text>
+              <Text style={styles.inputLabel}>{t('auth.phoneLabel').toUpperCase()}</Text>
               <View style={[
                 styles.inputContainer,
                 isFocused && styles.inputContainerFocused,
@@ -182,7 +184,7 @@ export default function PhoneLoginScreen({ navigation }: Props) {
                   style={styles.input}
                   value={phoneNumber}
                   onChangeText={formatPhoneNumber}
-                  placeholder="9876543210"
+                  placeholder={t('auth.phonePlaceholder')}
                   placeholderTextColor={AIColors.textMuted}
                   keyboardType="phone-pad"
                   maxLength={10}
@@ -199,7 +201,7 @@ export default function PhoneLoginScreen({ navigation }: Props) {
               <View style={styles.infoBox}>
                 <Text style={styles.infoIcon}>🔒</Text>
                 <Text style={styles.infoText}>
-                  Your number is secure and will only be used for verification
+                  {t('auth.phoneInfo')}
                 </Text>
               </View>
             </View>
@@ -224,7 +226,7 @@ export default function PhoneLoginScreen({ navigation }: Props) {
                     styles.continueButtonText,
                     !isValid && styles.continueButtonTextDisabled,
                   ]}>
-                    Send Verification Code
+                    {t('auth.phoneSend')}
                   </Text>
                   <Text style={[
                     styles.continueButtonIcon,

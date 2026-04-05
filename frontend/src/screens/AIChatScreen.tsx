@@ -9,7 +9,8 @@ import { useNavigation } from '@react-navigation/native';
 import { useAuthStore } from '../store/authStore';
 import { FinancialProfile } from '../types';
 import { sendMessage, getSuggestedPrompts, ChatMessage } from '../services/OpenrouterService';
-import { SIMPLE_TEXT } from '../utils/textConstants';
+import { useLanguage } from '../i18n/LanguageContext';
+import { getSimpleText } from '../utils/textConstants';
 import { AIColors, AISpacing, AIRadius, AITypography } from '../theme/aiTheme';
 import { GridBackdrop } from '../components/ui';
 
@@ -181,12 +182,14 @@ const TypingIndicator: React.FC = () => {
 export default function AIChatScreen() {
   const navigation = useNavigation();
   const { currentUser: user } = useAuthStore();
+  const { language } = useLanguage();
+  const copy = getSimpleText(language);
   const [profile, setProfile] = useState<FinancialProfile | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const listRef = useRef<FlatList>(null);
-  const suggestedPrompts = getSuggestedPrompts(user);
+  const suggestedPrompts = getSuggestedPrompts(user, language);
 
   useEffect(() => {
     (async () => {
@@ -201,9 +204,9 @@ export default function AIChatScreen() {
     const name = user?.fullName?.split(' ')[0] || 'there';
     setMessages([{
       role: 'model',
-      text: SIMPLE_TEXT.chat.greeting(name),
+      text: copy.chat.greeting(name),
     }]);
-  }, []);
+  }, [copy.chat, user?.fullName]);
 
   const scrollToBottom = useCallback(() => {
     setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 100);
@@ -218,15 +221,15 @@ export default function AIChatScreen() {
     setIsLoading(true);
     scrollToBottom();
     try {
-      const reply = await sendMessage(trimmed, messages, user ?? null, profile);
+      const reply = await sendMessage(trimmed, messages, user ?? null, profile, language);
       setMessages((prev) => [...prev, { role: 'model', text: reply }]);
     } catch (err: any) {
-      setMessages((prev) => [...prev, { role: 'model', text: SIMPLE_TEXT.chat.genericError }]);
+      setMessages((prev) => [...prev, { role: 'model', text: copy.chat.genericError }]);
     } finally {
       setIsLoading(false);
       scrollToBottom();
     }
-  }, [isLoading, messages, user, profile]);
+  }, [copy.chat.genericError, isLoading, language, messages, user, profile]);
 
   const renderItem = useCallback(({ item, index }: { item: ChatMessage; index: number }) => (
     <Bubble message={item} isLast={index === messages.length - 1} />
@@ -246,7 +249,7 @@ export default function AIChatScreen() {
           </View>
           <View>
             <Text style={styles.headerTitle}>Fin</Text>
-            <Text style={styles.headerSub}>{SIMPLE_TEXT.chat.subtitle}</Text>
+            <Text style={styles.headerSub}>{copy.chat.subtitle}</Text>
           </View>
         </View>
         <View style={styles.geminiBadge}>
@@ -268,7 +271,7 @@ export default function AIChatScreen() {
 
         {messages.filter((m) => m.role === 'user').length === 0 && (
           <View style={styles.suggestionsContainer}>
-            <Text style={styles.suggestionsLabel}>{SIMPLE_TEXT.chat.askLabel}</Text>
+            <Text style={styles.suggestionsLabel}>{copy.chat.askLabel}</Text>
             <View style={styles.suggestionsRow}>
               {suggestedPrompts.map((p) => (
                 <TouchableOpacity key={p} style={styles.suggestionChip} onPress={() => handleSend(p)} activeOpacity={0.7}>
@@ -282,7 +285,7 @@ export default function AIChatScreen() {
         <View style={styles.inputBar}>
           <TextInput
             style={styles.input}
-            placeholder={SIMPLE_TEXT.chat.placeholder}
+            placeholder={copy.chat.placeholder}
             placeholderTextColor={AIColors.textMuted}
             value={inputText}
             onChangeText={setInputText}

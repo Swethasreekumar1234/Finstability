@@ -9,6 +9,7 @@ import { AIColors, AIRadius, AISpacing, AITypography } from '../theme/aiTheme';
 import { GridBackdrop, ScreenHeader } from '../components/ui';
 import { apiService, TransactionItem } from '../services/apiService';
 import { useAuthStore } from '../store/authStore';
+import { useLanguage } from '../i18n/LanguageContext';
 
 type NavigationProp = CompositeNavigationProp<
   BottomTabNavigationProp<TabParamList, 'Transactions'>,
@@ -27,7 +28,13 @@ function currentMonth(): string {
   return `${d.getFullYear()}-${m}`;
 }
 
+function categoryLabel(value: string, t: (key: string) => string): string {
+  if (value === 'all') return t('transactions.all');
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
 export default function TransactionsScreen({ navigation }: { navigation: NavigationProp }) {
+  const { t } = useLanguage();
   const firebaseUid = useAuthStore((s) => s.firebaseUid);
   const [transactions, setTransactions] = useState<TransactionItem[]>([]);
   const [month, setMonth] = useState(currentMonth());
@@ -44,11 +51,11 @@ export default function TransactionsScreen({ navigation }: { navigation: Navigat
       const data = await apiService.listTransactions(userId, month, category);
       setTransactions(data);
     } catch {
-      setError('Unable to fetch transactions right now.');
+      setError(t('transactions.error'));
     } finally {
       setLoading(false);
     }
-  }, [category, month, userId]);
+  }, [category, month, t, userId]);
 
   useFocusEffect(
     useCallback(() => {
@@ -76,33 +83,33 @@ export default function TransactionsScreen({ navigation }: { navigation: Navigat
         keyboardShouldPersistTaps="handled"
       >
         <ScreenHeader
-          title="Transactions"
-          subtitle="Track income, expenses, and statement imports."
+          title={t('transactions.title')}
+          subtitle={t('transactions.subtitle')}
           onBack={navigation.canGoBack() ? () => navigation.goBack() : undefined}
         />
 
         <View style={styles.kpiRow}>
           <View style={styles.kpiCard}>
-            <Text style={styles.kpiLabel}>Income</Text>
+            <Text style={styles.kpiLabel}>{t('transactions.income')}</Text>
             <Text style={[styles.kpiValue, { color: AIColors.success }]}>{rupees(totals.income)}</Text>
           </View>
           <View style={styles.kpiCard}>
-            <Text style={styles.kpiLabel}>Expenses</Text>
+            <Text style={styles.kpiLabel}>{t('transactions.expenses')}</Text>
             <Text style={[styles.kpiValue, { color: AIColors.warning }]}>{rupees(totals.expense)}</Text>
           </View>
         </View>
 
         <View style={styles.filterCard}>
-          <Text style={styles.label}>Month (YYYY-MM)</Text>
+          <Text style={styles.label}>{t('transactions.month')}</Text>
           <TextInput
             style={styles.input}
             value={month}
             onChangeText={setMonth}
-            placeholder="2026-04"
+            placeholder={t('transactions.monthPlaceholder')}
             placeholderTextColor={AIColors.textMuted}
           />
 
-          <Text style={styles.label}>Category</Text>
+          <Text style={styles.label}>{t('transactions.category')}</Text>
           <View style={styles.chipsRow}>
             {CATEGORIES.map((item) => {
               const active = category === item;
@@ -112,26 +119,26 @@ export default function TransactionsScreen({ navigation }: { navigation: Navigat
                   style={[styles.chip, active && styles.chipActive]}
                   onPress={() => setCategory(item)}
                 >
-                  <Text style={[styles.chipText, active && styles.chipTextActive]}>{item}</Text>
+                  <Text style={[styles.chipText, active && styles.chipTextActive]}>{categoryLabel(item, t)}</Text>
                 </TouchableOpacity>
               );
             })}
           </View>
 
           <TouchableOpacity style={styles.refreshButton} onPress={loadTransactions}>
-            <Text style={styles.refreshText}>Apply Filters</Text>
+            <Text style={styles.refreshText}>{t('transactions.applyFilters')}</Text>
           </TouchableOpacity>
         </View>
 
         <View style={styles.actionsRow}>
           <TouchableOpacity style={styles.primaryBtn} onPress={() => navigation.navigate('AddTransaction')}>
-            <Text style={styles.primaryBtnText}>Add Transaction</Text>
+            <Text style={styles.primaryBtnText}>{t('transactions.addTransaction')}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.secondaryBtn} onPress={() => navigation.navigate('UploadStatement')}>
-            <Text style={styles.secondaryBtnText}>Upload Statement</Text>
+            <Text style={styles.secondaryBtnText}>{t('transactions.uploadStatement')}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.secondaryBtn} onPress={() => navigation.navigate('SpendingInsights')}>
-            <Text style={styles.secondaryBtnText}>Insights</Text>
+            <Text style={styles.secondaryBtnText}>{t('transactions.insights')}</Text>
           </TouchableOpacity>
         </View>
 
@@ -145,7 +152,7 @@ export default function TransactionsScreen({ navigation }: { navigation: Navigat
           </View>
         ) : transactions.length === 0 ? (
           <View style={styles.centerBox}>
-            <Text style={styles.emptyText}>No transactions found for these filters.</Text>
+            <Text style={styles.emptyText}>{t('transactions.empty')}</Text>
           </View>
         ) : (
           transactions.map((tx, index) => (

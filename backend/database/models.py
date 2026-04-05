@@ -105,6 +105,7 @@ class UserProfile(BaseModel):
     financial_goals: Optional[List[str]] = None
     investment_experience: Optional[int] = None
     updated_at_client: Optional[str] = None
+    language: Optional[str] = None
 
 # --- Other Models (Keep these as they are) ---
 

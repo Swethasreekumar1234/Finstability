@@ -27,12 +27,14 @@ import {
 } from '../screens';
 import TabNavigator from './TabNavigator';
 import { useAuthStore } from '../store/authStore';
+import { useLanguage } from '../i18n/LanguageContext';
 import { AIColors, AITypography, AISpacing, AIRadius, AIShadows } from '../theme/aiTheme';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export default function AppNavigator() {
   const { isLoggedIn, isInitialized, initialize } = useAuthStore();
+  const { t } = useLanguage();
   const [isReady, setIsReady] = useState(false);
   const pulseAnim = useRef(new Animated.Value(0.3)).current;
 
@@ -67,10 +69,10 @@ export default function AppNavigator() {
         <View style={styles.logoContainer}>
           <Text style={styles.loadingLogo}>₹</Text>
         </View>
-        <Text style={styles.loadingTitle}>FINSTABILITY</Text>
-        <Text style={styles.loadingSubtitle}>AI Financial Intelligence</Text>
+        <Text style={styles.loadingTitle}>{t('app.title')}</Text>
+        <Text style={styles.loadingSubtitle}>{t('app.subtitle')}</Text>
         <ActivityIndicator size="large" color={AIColors.primary} style={styles.spinner} />
-        <Text style={styles.loadingText}>Initializing...</Text>
+        <Text style={styles.loadingText}>{t('app.initializing')}</Text>
       </View>
     );
   }

@@ -8,6 +8,7 @@ import { View, StyleSheet } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { TabParamList } from '../types';
+import { useLanguage } from '../i18n/LanguageContext';
 import { AIColors, AIRadius, AITypography } from '../theme/aiTheme';
 
 // Screens
@@ -30,6 +31,8 @@ const TAB_ICONS: Record<keyof TabParamList, { active: IoniconsName; inactive: Io
 };
 
 export default function TabNavigator() {
+  const { t } = useLanguage();
+
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -50,11 +53,11 @@ export default function TabNavigator() {
         },
       })}
     >
-      <Tab.Screen name="Home" component={DashboardScreen} options={{ tabBarLabel: 'Home' }} />
-      <Tab.Screen name="Transactions" component={TransactionsScreen} options={{ tabBarLabel: 'Transactions' }} />
-      <Tab.Screen name="Goals" component={GoalsScreen} options={{ tabBarLabel: 'Goals' }} />
-      <Tab.Screen name="Benefits" component={BenefitsScreen} options={{ tabBarLabel: 'Benefits' }} />
-      <Tab.Screen name="Profile" component={FinancialProfileScreen} options={{ tabBarLabel: 'Profile' }} />
+      <Tab.Screen name="Home" component={DashboardScreen} options={{ tabBarLabel: t('nav.home') }} />
+      <Tab.Screen name="Transactions" component={TransactionsScreen} options={{ tabBarLabel: t('nav.transactions') }} />
+      <Tab.Screen name="Goals" component={GoalsScreen} options={{ tabBarLabel: t('nav.goals') }} />
+      <Tab.Screen name="Benefits" component={BenefitsScreen} options={{ tabBarLabel: t('nav.benefits') }} />
+      <Tab.Screen name="Profile" component={FinancialProfileScreen} options={{ tabBarLabel: t('nav.profile') }} />
     </Tab.Navigator>
   );
 }

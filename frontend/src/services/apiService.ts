@@ -93,6 +93,7 @@ export interface BackendProfile {
   missing_fields?: string[];
   unlocked_capabilities?: string[];
   next_prompt?: string | null;
+  language?: 'en' | 'ta';
 }
 
 export interface BackendScheme {

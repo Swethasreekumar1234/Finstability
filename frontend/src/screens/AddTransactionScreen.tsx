@@ -7,6 +7,7 @@ import { AIColors, AIRadius, AISpacing, AITypography } from '../theme/aiTheme';
 import { GridBackdrop, ScreenHeader } from '../components/ui';
 import { apiService } from '../services/apiService';
 import { useAuthStore } from '../store/authStore';
+import { useLanguage } from '../i18n/LanguageContext';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'AddTransaction'>;
@@ -14,11 +15,23 @@ type Props = {
 
 const CATEGORIES = ['food', 'transport', 'shopping', 'entertainment', 'salary', 'other'];
 
+function categoryLabel(item: string, t: (key: string) => string): string {
+  switch (item) {
+    case 'food': return t('transactions.food');
+    case 'transport': return t('transactions.transport');
+    case 'shopping': return t('transactions.shopping');
+    case 'entertainment': return t('transactions.entertainment');
+    case 'salary': return t('transactions.salary');
+    default: return t('transactions.other');
+  }
+}
+
 function today(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
 export default function AddTransactionScreen({ navigation }: Props) {
+  const { t } = useLanguage();
   const firebaseUid = useAuthStore((s) => s.firebaseUid);
   const currentUser = useAuthStore((s) => s.currentUser);
   const [date, setDate] = useState(today());
@@ -30,13 +43,13 @@ export default function AddTransactionScreen({ navigation }: Props) {
 
   const handleSubmit = async () => {
     if (!amount || !merchant.trim() || !date) {
-      Alert.alert('Missing fields', 'Please fill date, amount, and merchant.');
+      Alert.alert(t('transactions.missingFieldsTitle'), t('transactions.missingFieldsBody'));
       return;
     }
 
     const parsedAmount = parseFloat(amount);
     if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
-      Alert.alert('Invalid amount', 'Please enter an amount greater than 0.');
+      Alert.alert(t('transactions.invalidAmountTitle'), t('transactions.invalidAmountBody'));
       return;
     }
 
@@ -50,16 +63,16 @@ export default function AddTransactionScreen({ navigation }: Props) {
         merchant: merchant.trim(),
         category,
       });
-      Alert.alert('Saved', 'Transaction added successfully.');
+      Alert.alert(t('transactions.savedTitle'), t('transactions.savedBody'));
       navigation.goBack();
     } catch (error: any) {
       const message = String(error?.message || 'Unable to save transaction. Please try again.');
       if (message.toLowerCase().includes('duplicate transaction detected')) {
-        Alert.alert('Already saved', 'This transaction already exists.');
+        Alert.alert(t('transactions.duplicateTitle'), t('transactions.duplicateBody'));
         navigation.goBack();
         return;
       }
-      Alert.alert('Failed', message);
+      Alert.alert(t('transactions.failedTitle'), message);
     } finally {
       setLoading(false);
     }
@@ -70,57 +83,57 @@ export default function AddTransactionScreen({ navigation }: Props) {
       <GridBackdrop />
       <ScrollView contentContainerStyle={styles.content}>
         <ScreenHeader
-          title="Add Transaction"
-          subtitle="Log expenses and income manually."
+          title={t('transactions.addTitle')}
+          subtitle={t('transactions.addSubtitle')}
           onBack={() => navigation.goBack()}
         />
 
         <View style={styles.card}>
-          <Text style={styles.label}>Date (YYYY-MM-DD)</Text>
+          <Text style={styles.label}>{t('transactions.date')}</Text>
           <TextInput
             style={styles.input}
             value={date}
             onChangeText={setDate}
-            placeholder="2026-04-01"
+            placeholder={t('transactions.datePlaceholder')}
             placeholderTextColor={AIColors.textMuted}
           />
 
-          <Text style={styles.label}>Amount</Text>
+          <Text style={styles.label}>{t('transactions.amount')}</Text>
           <TextInput
             style={styles.input}
             value={amount}
             onChangeText={setAmount}
             keyboardType="numeric"
-            placeholder="450"
+            placeholder={t('transactions.amountPlaceholder')}
             placeholderTextColor={AIColors.textMuted}
           />
 
-          <Text style={styles.label}>Merchant</Text>
+          <Text style={styles.label}>{t('transactions.merchant')}</Text>
           <TextInput
             style={styles.input}
             value={merchant}
             onChangeText={setMerchant}
-            placeholder="Swiggy"
+            placeholder={t('transactions.merchantPlaceholder')}
             placeholderTextColor={AIColors.textMuted}
           />
 
-          <Text style={styles.label}>Type</Text>
+          <Text style={styles.label}>{t('transactions.type')}</Text>
           <View style={styles.row}>
             <TouchableOpacity
               style={[styles.chip, type === 'expense' && styles.activeChip]}
               onPress={() => setType('expense')}
             >
-              <Text style={[styles.chipText, type === 'expense' && styles.activeChipText]}>Expense</Text>
+              <Text style={[styles.chipText, type === 'expense' && styles.activeChipText]}>{t('transactions.expense')}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.chip, type === 'income' && styles.activeChip]}
               onPress={() => setType('income')}
             >
-              <Text style={[styles.chipText, type === 'income' && styles.activeChipText]}>Income</Text>
+              <Text style={[styles.chipText, type === 'income' && styles.activeChipText]}>{t('transactions.income')}</Text>
             </TouchableOpacity>
           </View>
 
-          <Text style={styles.label}>Category</Text>
+          <Text style={styles.label}>{t('transactions.category')}</Text>
           <View style={styles.rowWrap}>
             {CATEGORIES.map((item) => (
               <TouchableOpacity
@@ -128,13 +141,13 @@ export default function AddTransactionScreen({ navigation }: Props) {
                 style={[styles.chip, category === item && styles.activeChip]}
                 onPress={() => setCategory(item)}
               >
-                <Text style={[styles.chipText, category === item && styles.activeChipText]}>{item}</Text>
+                <Text style={[styles.chipText, category === item && styles.activeChipText]}>{categoryLabel(item, t)}</Text>
               </TouchableOpacity>
             ))}
           </View>
 
           <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit} disabled={loading}>
-            <Text style={styles.submitText}>{loading ? 'Saving...' : 'Save Transaction'}</Text>
+            <Text style={styles.submitText}>{loading ? t('transactions.saving') : t('transactions.saveTransaction')}</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>

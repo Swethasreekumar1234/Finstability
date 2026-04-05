@@ -15,6 +15,7 @@ import { RootStackParamList } from '../types';
 import { useAuthStore } from '../store/authStore';
 import { AIColors, AISpacing, AIRadius, AITypography } from '../theme/aiTheme';
 import { GridBackdrop, ScreenHeader } from '../components/ui';
+import { useLanguage } from '../i18n/LanguageContext';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'EmailSignin'>;
@@ -22,6 +23,7 @@ type Props = {
 
 export default function EmailSigninScreen({ navigation }: Props) {
   const { signInWithEmail, isGoogleLoading, authError, clearError } = useAuthStore();
+  const { t } = useLanguage();
   const [email, setEmail] = useState('');
 
   const handleContinue = async () => {
@@ -41,20 +43,20 @@ export default function EmailSigninScreen({ navigation }: Props) {
       <SafeAreaView style={styles.safeArea}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.content}>
           <ScreenHeader
-            title="Sign In with Email"
-            subtitle="Continue with your registered email"
+            title={t('auth.emailTitle')}
+            subtitle={t('auth.emailSubtitle')}
             onBack={() => navigation.goBack()}
           />
 
           <View style={styles.card}>
             {authError ? <Text style={styles.errorText}>{authError}</Text> : null}
 
-            <Text style={styles.label}>Email</Text>
+            <Text style={styles.label}>{t('auth.emailLabel')}</Text>
             <TextInput
               style={styles.input}
               value={email}
               onChangeText={setEmail}
-              placeholder="Email"
+              placeholder={t('auth.emailPlaceholder')}
               placeholderTextColor={AIColors.textMuted}
               keyboardType="email-address"
               autoCapitalize="none"
@@ -64,14 +66,14 @@ export default function EmailSigninScreen({ navigation }: Props) {
               {isGoogleLoading ? (
                 <ActivityIndicator color={AIColors.background} />
               ) : (
-                <Text style={styles.primaryText}>Continue</Text>
+                <Text style={styles.primaryText}>{t('auth.emailContinue')}</Text>
               )}
             </TouchableOpacity>
 
             <View style={styles.linkRow}>
-              <Text style={styles.linkText}>Don&apos;t have an account? </Text>
+              <Text style={styles.linkText}>{t('auth.emailNoAccount')} </Text>
               <TouchableOpacity onPress={() => navigation.navigate('EmailSignup')}>
-                <Text style={styles.linkCta}>Create your account</Text>
+                <Text style={styles.linkCta}>{t('auth.emailCreateAccount')}</Text>
               </TouchableOpacity>
             </View>
           </View>

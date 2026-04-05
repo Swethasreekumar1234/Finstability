@@ -13,6 +13,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { FinancialGoal, FinancialGoalLabels, FinancialProfile, UserGoal } from '../types';
 import { AIColors, AISpacing, AIRadius, AIShadows, AISchemeCategoryColors } from '../theme/aiTheme';
 import { ProgressBar } from '../components/ai';
+import { useLanguage } from '../i18n/LanguageContext';
 
 const PROFILE_KEY = 'financial_profile';
 const GOALS_KEY   = 'user_goals';
@@ -54,6 +55,7 @@ const PRESET_GOALS: FinancialGoal[] = [
 ];
 
 export default function GoalsScreen() {
+  const { t } = useLanguage();
   const [goals, setGoals]       = useState<UserGoal[]>([]);
   const [profile, setProfile]   = useState<FinancialProfile | null>(null);
   const [loading, setLoading]   = useState(true);
@@ -106,9 +108,9 @@ export default function GoalsScreen() {
   };
 
   const deleteGoal = (id: string) => {
-    Alert.alert('Delete Goal', 'Remove this goal?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => saveGoals(goals.filter((g) => g.id !== id)) },
+    Alert.alert(t('goals.deleteTitle'), t('goals.deletePrompt'), [
+      { text: t('goals.cancel'), style: 'cancel' },
+      { text: t('goals.delete'), style: 'destructive', onPress: () => saveGoals(goals.filter((g) => g.id !== id)) },
     ]);
   };
 
@@ -125,9 +127,9 @@ export default function GoalsScreen() {
     <SafeAreaView style={st.safe}>
       {/* Header */}
       <View style={st.header}>
-        <Text style={st.title}>Financial Goals</Text>
+        <Text style={st.title}>{t('goals.title')}</Text>
         <TouchableOpacity style={st.addBtn} onPress={() => setShowModal(true)}>
-          <Text style={st.addBtnTxt}>+ Add Goal</Text>
+          <Text style={st.addBtnTxt}>{t('goals.addGoal')}</Text>
         </TouchableOpacity>
       </View>
 
@@ -135,12 +137,10 @@ export default function GoalsScreen() {
         {goals.length === 0 ? (
           <View style={st.emptyCard}>
             <Text style={st.emptyEmoji}>🎯</Text>
-            <Text style={st.emptyTitle}>No Goals Yet</Text>
-            <Text style={st.emptyDesc}>
-              Add goals like emergency fund, buying a home, or retirement to track your progress.
-            </Text>
+            <Text style={st.emptyTitle}>{t('goals.emptyTitle')}</Text>
+            <Text style={st.emptyDesc}>{t('goals.emptyDesc')}</Text>
             <TouchableOpacity style={st.addGoalCta} onPress={() => setShowModal(true)}>
-              <Text style={st.addGoalCtaTxt}>Set Your First Goal</Text>
+              <Text style={st.addGoalCtaTxt}>{t('goals.firstGoal')}</Text>
             </TouchableOpacity>
           </View>
         ) : (
@@ -164,16 +164,16 @@ export default function GoalsScreen() {
                 {/* Amounts */}
                 <View style={st.amountRow}>
                   <View>
-                    <Text style={st.amountLbl}>Current</Text>
+                    <Text style={st.amountLbl}>{t('goals.current')}</Text>
                     <Text style={[st.amountVal, { color: goal.color }]}>{fmt(goal.currentAmount)}</Text>
                   </View>
                   <Text style={st.amountSep}>→</Text>
                   <View>
-                    <Text style={st.amountLbl}>Target</Text>
+                    <Text style={st.amountLbl}>{t('goals.target')}</Text>
                     <Text style={st.amountVal}>{fmt(goal.targetAmount)}</Text>
                   </View>
                   <View>
-                    <Text style={st.amountLbl}>Progress</Text>
+                    <Text style={st.amountLbl}>{t('goals.progress')}</Text>
                     <Text style={[st.amountVal, { color: goal.color }]}>{Math.round(progress * 100)}%</Text>
                   </View>
                 </View>
@@ -185,7 +185,7 @@ export default function GoalsScreen() {
 
                 {/* Monthly contribution */}
                 <View style={st.contribRow}>
-                  <Text style={st.contribLbl}>Monthly SIP</Text>
+                  <Text style={st.contribLbl}>{t('goals.monthlySip')}</Text>
                   <View style={st.contribCtrl}>
                     <TouchableOpacity style={st.ctrlBtn} onPress={() => updateContrib(goal.id, -500)}>
                       <Text style={st.ctrlBtnTxt}>−</Text>
@@ -200,7 +200,7 @@ export default function GoalsScreen() {
                 {/* ETA */}
                 <View style={st.etaRow}>
                   <Text style={st.etaLbl}>
-                    {months > 0 ? `Est. completion: ${eta} (${months} months)` : '🎉 Goal Achieved!'}
+                    {months > 0 ? `${t('goals.completionPrefix')} ${eta} (${months} months)` : `🎉 ${t('goals.achieved')}`}
                   </Text>
                 </View>
               </View>
@@ -214,9 +214,9 @@ export default function GoalsScreen() {
       <Modal visible={showModal} animationType="slide" transparent>
         <View style={st.modalOverlay}>
           <View style={st.modalCard}>
-            <Text style={st.modalTitle}>Add New Goal</Text>
+            <Text style={st.modalTitle}>{t('goals.addNewGoal')}</Text>
 
-            <Text style={st.fieldLabel}>Goal Type</Text>
+            <Text style={st.fieldLabel}>{t('goals.goalType')}</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={st.typeList}>
               {(Object.values(FinancialGoal) as FinancialGoal[]).map((g) => {
                 const m = GOAL_META[g];
@@ -235,7 +235,7 @@ export default function GoalsScreen() {
               })}
             </ScrollView>
 
-            <Text style={st.fieldLabel}>Target Amount (₹)</Text>
+            <Text style={st.fieldLabel}>{t('goals.targetAmount')}</Text>
             <TextInput
               style={st.input}
               placeholder={`e.g. ${GOAL_META[selType].defaultTarget.toLocaleString()}`}
@@ -245,7 +245,7 @@ export default function GoalsScreen() {
               onChangeText={setTargetAmt}
             />
 
-            <Text style={st.fieldLabel}>Already Saved (₹)</Text>
+            <Text style={st.fieldLabel}>{t('goals.alreadySaved')}</Text>
             <TextInput
               style={st.input}
               placeholder="0"
@@ -255,7 +255,7 @@ export default function GoalsScreen() {
               onChangeText={setCurrentAmt}
             />
 
-            <Text style={st.fieldLabel}>Monthly Contribution (₹)</Text>
+            <Text style={st.fieldLabel}>{t('goals.monthlyContribution')}</Text>
             <TextInput
               style={st.input}
               placeholder={profile ? String(Math.round(profile.monthlyIncome * 0.1)) : '5000'}
@@ -267,10 +267,10 @@ export default function GoalsScreen() {
 
             <View style={st.modalActions}>
               <TouchableOpacity style={st.cancelBtn} onPress={() => setShowModal(false)}>
-                <Text style={st.cancelTxt}>Cancel</Text>
+                <Text style={st.cancelTxt}>{t('goals.cancel')}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={st.saveBtn} onPress={addGoal}>
-                <Text style={st.saveTxt}>Add Goal</Text>
+                <Text style={st.saveTxt}>{t('goals.saveGoal')}</Text>
               </TouchableOpacity>
             </View>
           </View>

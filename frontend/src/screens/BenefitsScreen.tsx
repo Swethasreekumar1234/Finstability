@@ -17,6 +17,8 @@ import { apiService, BackendProfile, SchemeRecommendation } from '../services/ap
 import { getFinancialRecommendations } from '../services/recommendationEngine';
 import { useAuthStore } from '../store/authStore';
 import { nextProfilePrompt, applyPromptAnswerToPayload } from '../utils/profilePrompts';
+import { useLanguage } from '../i18n/LanguageContext';
+import { localizeSchemeList } from '../utils/schemeLocalization';
 
 const PROFILE_KEY = 'financial_profile';
 const OTHER_OCCUPATION_VALUE = '__other__';
@@ -32,6 +34,16 @@ function fmt(n: number): string {
 
 function catColor(cat: string): string {
   return AISchemeCategoryColors[cat] ?? AIColors.primary;
+}
+
+function getCategoryLabel(cat: string, t: (key: string) => string): string {
+  if (cat === 'All') return t('benefits.labelAll');
+  if (cat === 'subsidy') return t('benefits.labelSubsidy');
+  if (cat === 'pension') return t('benefits.labelPension');
+  if (cat === 'insurance') return t('benefits.labelInsurance');
+  if (cat === 'grant') return t('benefits.labelGrant');
+  if (cat === 'loan_support') return t('benefits.labelLoan');
+  return t('benefits.labelScholarship');
 }
 
 function buildRelevanceKeywords(profile: BackendProfile | null, localProfile: FinancialProfile | null, topExpenseCategories: string[]): string[] {
@@ -98,6 +110,7 @@ function rankRelevantSchemes(schemes: SchemeRecommendation[], keywords: string[]
 }
 
 export default function BenefitsScreen() {
+  const { language, t } = useLanguage();
   const { currentUser, firebaseUid } = useAuthStore();
   const [schemes, setSchemes]         = useState<SchemeRecommendation[]>([]);
   const [filtered, setFiltered]       = useState<SchemeRecommendation[]>([]);
@@ -151,6 +164,7 @@ export default function BenefitsScreen() {
         user_id: resolvedUserId,
         firebase_uid: resolvedUserId,
         email: resolvedEmail,
+        language,
         age: profileDoc?.age_confirmed ? Number(profileDoc?.age ?? 30) : undefined,
         age_confirmed: profileDoc?.age_confirmed ?? false,
         gender: String(profileDoc?.gender ?? 'other').toLowerCase(),
@@ -185,7 +199,7 @@ export default function BenefitsScreen() {
 
         const resp = await apiService.recommendSchemes(bp);
         const keywords = buildRelevanceKeywords(profileDoc, p, topExpenseCategories);
-        const relevantSchemes = rankRelevantSchemes(resp.schemes, keywords);
+        const relevantSchemes = localizeSchemeList(rankRelevantSchemes(resp.schemes, keywords), language);
         setSchemes(relevantSchemes);
         setFiltered(relevantSchemes);
         setTotal(resp.total_estimated_benefits);
@@ -196,7 +210,7 @@ export default function BenefitsScreen() {
         setBackendAvail(false);
         if (p) {
           const recs = getFinancialRecommendations('WORKING_PROFESSIONAL' as any, p.monthlyIncome, p.riskTolerance, p.financialGoals, p);
-          const localSchemes: SchemeRecommendation[] = recs.schemes.map((s, i) => ({
+          const localSchemes: SchemeRecommendation[] = localizeSchemeList(recs.schemes.map((s, i) => ({
             scheme: {
               scheme_id: `local_${i}`,
               scheme_name: s.scheme_name,
@@ -211,7 +225,7 @@ export default function BenefitsScreen() {
             eligibility_match: 0.8,
             reason: s.target_beneficiaries || 'Based on your profile',
             estimated_annual_benefit: 0,
-          }));
+          })), language);
           setSchemes(localSchemes);
           setFiltered(localSchemes);
         }
@@ -348,14 +362,14 @@ export default function BenefitsScreen() {
 
         {/* Missing Benefits Hero */}
         <View style={st.hero}>
-          <Text style={st.heroTag}>Estimated Benefits You&apos;re Missing</Text>
+          <Text style={st.heroTag}>{t('benefits.title')}</Text>
           <Text style={st.heroAmount}>{fmt(totalBenefits)}<Text style={st.heroYear}>/year</Text></Text>
           {missingCount > 0 && (
-            <Text style={st.heroSub}>{missingCount} more scheme{missingCount !== 1 ? 's' : ''} may also apply</Text>
+            <Text style={st.heroSub}>{missingCount} {t('benefits.moreSchemes')}</Text>
           )}
           {!backendAvail && (
             <View style={st.offlinePill}>
-              <Text style={st.offlineTxt}>Offline — start backend for live data</Text>
+              <Text style={st.offlineTxt}>{t('benefits.offline')}</Text>
             </View>
           )}
         </View>
@@ -363,7 +377,7 @@ export default function BenefitsScreen() {
         {/* Safety notice */}
         <View style={st.notice}>
           <Text style={st.noticeTxt}>
-            ℹ️  Applications are processed on official government websites. This app only helps you discover eligible schemes.
+            ℹ️  {t('benefits.notice')}
           </Text>
         </View>
 
@@ -389,7 +403,7 @@ export default function BenefitsScreen() {
                   style={st.promptCustomInput}
                   value={customOccupationSubtype}
                   onChangeText={setCustomOccupationSubtype}
-                  placeholder="Type your occupation subtype"
+                    placeholder={t('benefits.promptPlaceholder')}
                   placeholderTextColor={AIColors.textMuted}
                   editable={!savingPrompt}
                   autoCapitalize="words"
@@ -399,12 +413,12 @@ export default function BenefitsScreen() {
                   onPress={() => void submitCustomOccupationSubtype()}
                   disabled={!customOccupationSubtype.trim() || savingPrompt}
                 >
-                  <Text style={st.promptCustomBtnText}>Save</Text>
+                  <Text style={st.promptCustomBtnText}>{t('benefits.save')}</Text>
                 </TouchableOpacity>
               </View>
             )}
             <TouchableOpacity onPress={() => setPromptDismissed(true)} disabled={savingPrompt}>
-              <Text style={st.promptSkip}>{savingPrompt ? 'Saving...' : 'Skip for now'}</Text>
+              <Text style={st.promptSkip}>{savingPrompt ? t('benefits.saving') : t('benefits.skip')}</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -427,7 +441,7 @@ export default function BenefitsScreen() {
                 st.filterChipTxt,
                 activeCat === cat && { color: cat === 'All' ? AIColors.primary : catColor(cat) },
               ]}>
-                {cat === 'All' ? 'All' : cat.replace('_', ' ')}
+                {getCategoryLabel(cat, t)}
               </Text>
             </TouchableOpacity>
           ))}
@@ -446,7 +460,7 @@ export default function BenefitsScreen() {
               <View style={st.schemeTop}>
                 <View style={[st.catTag, { backgroundColor: cc + '22' }]}>
                   <Text style={[st.catTagTxt, { color: cc }]}>
-                    {rec.scheme.category.replace('_', ' ').toUpperCase()}
+                    {getCategoryLabel(rec.scheme.category, t).toUpperCase()}
                   </Text>
                 </View>
                 {rec.scheme.estimated_annual_benefit != null && rec.scheme.estimated_annual_benefit > 0 && (
@@ -480,13 +494,13 @@ export default function BenefitsScreen() {
                   style={st.applyBtn}
                   onPress={() => Linking.openURL(rec.scheme.application_link)}
                 >
-                  <Text style={st.applyTxt}>Apply Now</Text>
+                  <Text style={st.applyTxt}>{t('benefits.applyNow')}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={st.detailBtn}
                   onPress={() => toggleExpand(rec.scheme.scheme_id)}
                 >
-                  <Text style={st.detailBtnTxt}>{isOpen ? 'Hide Details' : 'View Details'}</Text>
+                  <Text style={st.detailBtnTxt}>{isOpen ? 'Hide Details' : t('benefits.viewDetails')}</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -495,7 +509,7 @@ export default function BenefitsScreen() {
 
         {filtered.length === 0 && (
           <View style={st.emptyCard}>
-            <Text style={st.emptyTxt}>No schemes found for this category. Try a different filter.</Text>
+            <Text style={st.emptyTxt}>{t('benefits.noSchemes')}</Text>
           </View>
         )}
 

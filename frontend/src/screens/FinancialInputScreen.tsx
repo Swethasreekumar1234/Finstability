@@ -34,6 +34,7 @@ import { apiService, BackendProfile } from '../services/apiService';
 import { useAuthStore } from '../store/authStore';
 import { GridBackdrop, ScreenHeader } from '../components/ui';
 import { nextProfilePrompt, applyPromptAnswerToPayload } from '../utils/profilePrompts';
+import { useLanguage } from '../i18n/LanguageContext';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'FinancialInput'>;
@@ -61,6 +62,7 @@ const GOAL_OPTIONS = Object.values(FinancialGoal);
 const OTHER_OCCUPATION_VALUE = '__other__';
 
 export default function FinancialInputScreen({ navigation, route }: Props) {
+  const { t } = useLanguage();
   const { currentUser, firebaseUid, loadUserProfile } = useAuthStore();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(true);
@@ -184,7 +186,7 @@ export default function FinancialInputScreen({ navigation, route }: Props) {
 
   const save = async () => {
     if (Number(monthlyIncome) <= 0) {
-      Alert.alert('Missing income', 'Please enter a valid monthly income.');
+      Alert.alert(t('financialInput.missingIncomeTitle'), t('financialInput.missingIncomeBody'));
       return;
     }
 
@@ -310,7 +312,7 @@ export default function FinancialInputScreen({ navigation, route }: Props) {
         navigation.goBack();
       }
     } catch {
-      Alert.alert('Save failed', 'Could not save profile. Please try again.');
+      Alert.alert(t('financialInput.saveFailedTitle'), t('financialInput.saveFailedBody'));
     } finally {
       setSaving(false);
     }
@@ -319,7 +321,7 @@ export default function FinancialInputScreen({ navigation, route }: Props) {
   if (loading) {
     return (
       <SafeAreaView style={styles.safe}>
-        <View style={styles.center}><Text style={styles.loadingText}>Loading profile...</Text></View>
+        <View style={styles.center}><Text style={styles.loadingText}>{t('financialInput.loading')}</Text></View>
       </SafeAreaView>
     );
   }
@@ -330,14 +332,14 @@ export default function FinancialInputScreen({ navigation, route }: Props) {
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           <ScreenHeader
-            title="Update Financial Profile"
-            subtitle="Complete these 5 sections for better recommendations."
+            title={t('financialInput.title')}
+            subtitle={t('financialInput.subtitle')}
             onBack={() => navigation.goBack()}
-            backLabel="Back"
+            backLabel={t('financialInput.back')}
           />
 
           <View style={styles.progressTrack}><View style={[styles.progressFill, { width: `${Math.round(completion * 100)}%` }]} /></View>
-          <Text style={styles.progressText}>{Math.round(completion * 100)}% complete</Text>
+          <Text style={styles.progressText}>{Math.round(completion * 100)}% {t('financialInput.progressSuffix')}</Text>
 
           <View style={styles.stepRow}>
             {[1, 2, 3, 4, 5].map((s) => (
@@ -349,29 +351,29 @@ export default function FinancialInputScreen({ navigation, route }: Props) {
 
           {step === 1 && (
             <View style={styles.card}>
-              <Text style={styles.sectionTitle}>Income & Expenses</Text>
-              <Text style={styles.inputLabel}>Monthly Income</Text>
+              <Text style={styles.sectionTitle}>{t('financialInput.incomeExpenses')}</Text>
+              <Text style={styles.inputLabel}>{t('financialInput.monthlyIncome')}</Text>
               <TextInput value={monthlyIncome} onChangeText={setMonthlyIncome} keyboardType="numeric" style={styles.input} placeholder="30000" placeholderTextColor={AIColors.textMuted} />
-              <Text style={styles.inputLabel}>Monthly Expenses</Text>
+              <Text style={styles.inputLabel}>{t('financialInput.monthlyExpenses')}</Text>
               <TextInput value={monthlyExpenses} onChangeText={setMonthlyExpenses} keyboardType="numeric" style={styles.input} placeholder="18000" placeholderTextColor={AIColors.textMuted} />
-              <Text style={styles.helper}>Current surplus: {money((Number(monthlyIncome) || 0) - (Number(monthlyExpenses) || 0))}</Text>
+              <Text style={styles.helper}>{t('financialInput.currentSurplus')}: {money((Number(monthlyIncome) || 0) - (Number(monthlyExpenses) || 0))}</Text>
             </View>
           )}
 
           {step === 2 && (
             <View style={styles.card}>
-              <Text style={styles.sectionTitle}>Assets & Liabilities</Text>
-              <Text style={styles.inputLabel}>Total Savings</Text>
+              <Text style={styles.sectionTitle}>{t('financialInput.assetsLiabilities')}</Text>
+              <Text style={styles.inputLabel}>{t('financialInput.totalSavings')}</Text>
               <TextInput value={totalSavings} onChangeText={setTotalSavings} keyboardType="numeric" style={styles.input} placeholder="60000" placeholderTextColor={AIColors.textMuted} />
-              <Text style={styles.inputLabel}>Existing Loans</Text>
+              <Text style={styles.inputLabel}>{t('financialInput.existingLoans')}</Text>
               <TextInput value={existingLoans} onChangeText={setExistingLoans} keyboardType="numeric" style={styles.input} placeholder="0" placeholderTextColor={AIColors.textMuted} />
             </View>
           )}
 
           {step === 3 && (
             <View style={styles.card}>
-              <Text style={styles.sectionTitle}>Employment & Risk</Text>
-              <Text style={styles.inputLabel}>Employment Type</Text>
+              <Text style={styles.sectionTitle}>{t('financialInput.employmentRisk')}</Text>
+              <Text style={styles.inputLabel}>{t('financialInput.employmentType')}</Text>
               <View style={styles.wrap}>
                 {EMPLOYMENT_OPTIONS.map((t) => (
                   <TouchableOpacity
@@ -384,7 +386,7 @@ export default function FinancialInputScreen({ navigation, route }: Props) {
                 ))}
               </View>
 
-              <Text style={styles.inputLabel}>Risk Tolerance</Text>
+              <Text style={styles.inputLabel}>{t('financialInput.riskTolerance')}</Text>
               <View style={styles.wrap}>
                 {RISK_OPTIONS.map((r) => (
                   <TouchableOpacity key={r} style={[styles.chip, riskTolerance === r && styles.chipActive]} onPress={() => setRiskTolerance(r)}>
@@ -397,7 +399,7 @@ export default function FinancialInputScreen({ navigation, route }: Props) {
 
           {step === 4 && (
             <View style={styles.card}>
-              <Text style={styles.sectionTitle}>Financial Goals</Text>
+              <Text style={styles.sectionTitle}>{t('financialInput.goals')}</Text>
               <View style={styles.wrap}>
                 {GOAL_OPTIONS.map((g) => (
                   <TouchableOpacity key={g} style={[styles.chip, goals.includes(g) && styles.chipActive]} onPress={() => toggleGoal(g)}>
@@ -411,7 +413,7 @@ export default function FinancialInputScreen({ navigation, route }: Props) {
 
           {step === 5 && (
             <View style={styles.card}>
-              <Text style={styles.sectionTitle}>Investment Experience</Text>
+              <Text style={styles.sectionTitle}>{t('financialInput.experience')}</Text>
               <Text style={styles.sliderValue}>{investmentExperience}/10</Text>
               <Slider
                 style={{ width: '100%', height: 40 }}
@@ -424,7 +426,7 @@ export default function FinancialInputScreen({ navigation, route }: Props) {
                 value={investmentExperience}
                 onValueChange={(v) => setInvestmentExperience(v)}
               />
-              <Text style={styles.helper}>Higher values indicate more comfort with volatility and complex products.</Text>
+              <Text style={styles.helper}>{t('financialInput.investmentHelp')}</Text>
             </View>
           )}
 

@@ -20,6 +20,7 @@ import { useAuthStore } from '../store/authStore';
 import { AIColors, AISpacing, AIRadius, AIShadows, AITypography } from '../theme/aiTheme';
 import { GridBackdrop } from '../components/ui';
 import { useGoogleAuth } from '../config/google';
+import { useLanguage } from '../i18n/LanguageContext';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -29,6 +30,7 @@ type Props = {
 
 export default function LoginScreen({ navigation }: Props) {
   const { signInWithGoogle, isGoogleLoading, authError, clearError, isLoggedIn } = useAuthStore();
+  const { t } = useLanguage();
   const [localError, setLocalError] = useState<string | null>(null);
   const processedGoogleTokenRef = useRef<string | null>(null);
   
@@ -231,8 +233,8 @@ export default function LoginScreen({ navigation }: Props) {
               <View style={styles.logoRing} />
             </Animated.View>
             
-            <Text style={styles.appName}>FINSTABILITY</Text>
-            <Text style={styles.tagline}>AI-Powered Financial Intelligence</Text>
+            <Text style={styles.appName}>{t('auth.title')}</Text>
+            <Text style={styles.tagline}>{t('auth.subtitle')}</Text>
           </View>
 
           {/* Auth Section */}
@@ -252,13 +254,13 @@ export default function LoginScreen({ navigation }: Props) {
             >
               <View style={styles.buttonGlow} />
               <Text style={styles.buttonIcon}>→</Text>
-              <Text style={styles.primaryButtonText}>Continue with Phone</Text>
+              <Text style={styles.primaryButtonText}>{t('auth.phoneCta')}</Text>
             </TouchableOpacity>
 
             {/* Divider */}
             <View style={styles.divider}>
               <View style={styles.dividerLine} />
-              <Text style={styles.dividerText}>or</Text>
+              <Text style={styles.dividerText}>{t('auth.separator')}</Text>
               <View style={styles.dividerLine} />
             </View>
 
@@ -267,12 +269,12 @@ export default function LoginScreen({ navigation }: Props) {
               onPress={handleEmailSignin}
               activeOpacity={0.85}
             >
-              <Text style={styles.secondaryButtonText}>Sign In with Email</Text>
+              <Text style={styles.secondaryButtonText}>{t('auth.emailCta')}</Text>
             </TouchableOpacity>
 
             <View style={styles.divider}>
               <View style={styles.dividerLine} />
-              <Text style={styles.dividerText}>or</Text>
+              <Text style={styles.dividerText}>{t('auth.separator')}</Text>
               <View style={styles.dividerLine} />
             </View>
 
@@ -289,7 +291,7 @@ export default function LoginScreen({ navigation }: Props) {
                   <View style={styles.googleIcon}>
                     <Text style={styles.googleG}>G</Text>
                   </View>
-                  <Text style={styles.secondaryButtonText}>Login with Google</Text>
+                  <Text style={styles.secondaryButtonText}>{t('auth.googleCta')}</Text>
                 </>
               )}
             </TouchableOpacity>
@@ -299,14 +301,14 @@ export default function LoginScreen({ navigation }: Props) {
           {/* Footer */}
           <View style={styles.footer}>
             <Text style={styles.termsText}>
-              By continuing, you agree to our{' '}
+              {t('auth.termsIntro')}{' '}
               <Text style={styles.termsLink}>Terms</Text>
               {' '}and{' '}
               <Text style={styles.termsLink}>Privacy Policy</Text>
             </Text>
             
             <View style={styles.versionBadge}>
-              <Text style={styles.versionText}>v1.0 • Powered by AI</Text>
+              <Text style={styles.versionText}>{t('auth.version')}</Text>
             </View>
           </View>
         </Animated.View>

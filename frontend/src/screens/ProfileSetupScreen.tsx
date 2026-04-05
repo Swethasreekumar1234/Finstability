@@ -30,6 +30,7 @@ import {
 import { useAuthStore } from '../store/authStore';
 import { AIColors, AIRadius, AISpacing, AITypography } from '../theme/aiTheme';
 import { ProgressBar } from '../components/ai';
+import { useLanguage } from '../i18n/LanguageContext';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'ProfileSetup'>;
@@ -118,6 +119,7 @@ function Chip({
 }
 
 export default function ProfileSetupScreen({ navigation }: Props) {
+  const { t } = useLanguage();
   const {
     currentUser,
     fullName,
@@ -175,16 +177,16 @@ export default function ProfileSetupScreen({ navigation }: Props) {
         useNativeDriver: true,
       }),
     ]).start();
-  }, [step]);
+  }, [step, t]);
 
   const progress = useMemo(() => step / TOTAL_STEPS, [step]);
 
   const stepUnlockText = useMemo(() => {
-    if (step === 1) return 'Unlocks: state-aware scheme matching';
-    if (step === 2) return 'Unlocks: life-stage recommendations';
-    if (step === 3) return 'Unlocks: budgeting and saving guidance';
-    if (step === 4) return 'Unlocks: insurance and debt-aware insights';
-    return 'Unlocks: goal-based planning and AI tips';
+    if (step === 1) return t('profileSetup.unlockState');
+    if (step === 2) return t('profileSetup.unlockLifeStage');
+    if (step === 3) return t('profileSetup.unlockBudgeting');
+    if (step === 4) return t('profileSetup.unlockInsurance');
+    return t('profileSetup.unlockGoals');
   }, [step]);
 
   const canProceed = useMemo(() => {
@@ -304,48 +306,48 @@ export default function ProfileSetupScreen({ navigation }: Props) {
     if (step === 1) {
       return (
         <>
-          <Text style={styles.questionTitle}>What should we call you?</Text>
-          <Text style={styles.questionSubtitle}>We will personalize your dashboard greeting and scheme prompts.</Text>
+          <Text style={styles.questionTitle}>{t('profileSetup.callName')}</Text>
+          <Text style={styles.questionSubtitle}>{t('profileSetup.callNameDesc')}</Text>
           <TextInput
             style={styles.input}
             value={localFullName}
             onChangeText={setLocalFullName}
-            placeholder="Your full name"
+            placeholder={t('profileSetup.yourName')}
             placeholderTextColor={AIColors.textMuted}
             autoCapitalize="words"
           />
 
-          <Text style={styles.fieldLabel}>Which city are you in?</Text>
+          <Text style={styles.fieldLabel}>{t('profileSetup.city')}</Text>
           <TextInput
             style={styles.input}
             value={localCity}
             onChangeText={setLocalCity}
-            placeholder="City"
+            placeholder={t('profileSetup.cityPlaceholder')}
             placeholderTextColor={AIColors.textMuted}
             autoCapitalize="words"
           />
 
-          <Text style={styles.fieldLabel}>Which state are you in?</Text>
+          <Text style={styles.fieldLabel}>{t('profileSetup.state')}</Text>
           <TextInput
             style={styles.input}
             value={localState}
             onChangeText={setLocalState}
-            placeholder="State"
+            placeholder={t('profileSetup.statePlaceholder')}
             placeholderTextColor={AIColors.textMuted}
             autoCapitalize="words"
           />
 
-          <Text style={styles.fieldLabel}>Age band</Text>
+          <Text style={styles.fieldLabel}>{t('profileSetup.ageBand')}</Text>
           <TextInput
             style={styles.input}
             value={localAge}
             onChangeText={setLocalAge}
             keyboardType="numeric"
-            placeholder="Age (18+)"
+            placeholder={t('profileSetup.agePlaceholder')}
             placeholderTextColor={AIColors.textMuted}
           />
 
-          <Text style={styles.fieldLabel}>Gender</Text>
+          <Text style={styles.fieldLabel}>{t('profileSetup.gender')}</Text>
           <View style={styles.chipWrap}>
             {genderChoices.map((item) => (
               <Chip
@@ -540,8 +542,8 @@ export default function ProfileSetupScreen({ navigation }: Props) {
 
     return (
       <>
-        <Text style={styles.questionTitle}>What are your top goals?</Text>
-        <Text style={styles.questionSubtitle}>Choose at least one, and we will prioritize your next actions around it.</Text>
+        <Text style={styles.questionTitle}>{t('profileSetup.goals')}</Text>
+        <Text style={styles.questionSubtitle}>{t('profileSetup.goalsDesc')}</Text>
 
         <View style={styles.chipWrap}>
           {Object.values(FinancialGoal).map((goal) => (
@@ -554,7 +556,7 @@ export default function ProfileSetupScreen({ navigation }: Props) {
           ))}
         </View>
 
-        <Text style={styles.fieldLabel}>Risk comfort</Text>
+        <Text style={styles.fieldLabel}>{t('profileSetup.riskComfort')}</Text>
         <View style={styles.chipWrap}>
           {Object.values(RiskTolerance).map((risk) => (
             <Chip
@@ -586,8 +588,8 @@ export default function ProfileSetupScreen({ navigation }: Props) {
                 <View style={styles.backPlaceholder} />
               )}
               <View style={styles.titleBlock}>
-                <Text style={styles.headerTitle}>Let&apos;s build your profile</Text>
-                <Text style={styles.headerSubtitle}>Step {step} of {TOTAL_STEPS}</Text>
+                <Text style={styles.headerTitle}>{t('profileSetup.title')}</Text>
+                <Text style={styles.headerSubtitle}>{t('profileSetup.subtitle', { step, total: TOTAL_STEPS })}</Text>
               </View>
             </View>
             <ProgressBar progress={progress} color={AIColors.primary} height={5} />
@@ -621,7 +623,7 @@ export default function ProfileSetupScreen({ navigation }: Props) {
               {isProfileSaving ? (
                 <ActivityIndicator color={AIColors.background} size="small" />
               ) : (
-                <Text style={styles.continueText}>{step < TOTAL_STEPS ? 'Continue' : 'Finish setup'}</Text>
+                <Text style={styles.continueText}>{step < TOTAL_STEPS ? t('profileSetup.continue') : t('profileSetup.finish')}</Text>
               )}
             </TouchableOpacity>
           </View>

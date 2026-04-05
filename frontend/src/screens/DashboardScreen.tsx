@@ -18,6 +18,8 @@ import { GridBackdrop, PriorityActionsQueue } from '../components/ui';
 import { getFinancialRecommendations } from '../services/recommendationEngine';
 import { apiService, SchemeRecommendation } from '../services/apiService';
 import { nextProfilePrompt, applyPromptAnswerToPayload } from '../utils/profilePrompts';
+import { useLanguage } from '../i18n/LanguageContext';
+import { localizeSchemeList } from '../utils/schemeLocalization';
 
 const PROFILE_KEY = 'financial_profile';
 type StackNav = NativeStackNavigationProp<RootStackParamList>;
@@ -69,6 +71,7 @@ function formatCapabilityLabel(value: string): string {
 export default function DashboardScreen() {
   const nav = useNavigation<StackNav>();
   const { currentUser: user, firebaseUid, logout } = useAuthStore();
+  const { language, setLanguage, t } = useLanguage();
   const [profile, setProfile] = useState<FinancialProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [schemes, setSchemes] = useState<SchemeRecommendation[]>([]);
@@ -113,19 +116,19 @@ export default function DashboardScreen() {
         : localProfile;
       if (profileDoc) {
         setProfileCompleteness(Number(profileDoc.profile_completeness ?? 0));
-        setProfileLayer(String(profileDoc.profile_layer ?? 'Identity & life stage'));
+        setProfileLayer(String(profileDoc.profile_layer ?? t('dashboard.identityLifeStage')));
         setMissingFields(Array.isArray(profileDoc.missing_fields) ? profileDoc.missing_fields : []);
         setUnlockedCapabilities(Array.isArray(profileDoc.unlocked_capabilities) ? profileDoc.unlocked_capabilities : []);
         setNextPrompt(profileDoc.next_prompt ?? null);
       } else if (localProfile) {
         setProfileCompleteness(0);
-        setProfileLayer('Local profile saved');
+        setProfileLayer(t('dashboard.localProfileSaved'));
         setMissingFields([]);
         setUnlockedCapabilities([]);
         setNextPrompt(null);
       } else {
         setProfileCompleteness(0);
-        setProfileLayer('Identity & life stage');
+        setProfileLayer(t('dashboard.identityLifeStage'));
         setMissingFields([]);
         setUnlockedCapabilities([]);
         setNextPrompt(null);
@@ -157,7 +160,7 @@ export default function DashboardScreen() {
             has_life_insurance: (profilePayload as any)?.has_life_insurance,
             has_health_insurance: (profilePayload as any)?.has_health_insurance,
           });
-          setSchemes(resp.schemes.slice(0, 3));
+          setSchemes(localizeSchemeList(resp.schemes.slice(0, 3), language));
           setTotalBenefits(resp.total_estimated_benefits);
         } catch { setSchemes([]); }
       }
@@ -287,7 +290,7 @@ export default function DashboardScreen() {
 
   const score = calculateHealthScore(profile);
   const h = new Date().getHours();
-  const greet = h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
+  const greet = h < 12 ? t('dashboard.goodMorning') : h < 18 ? t('dashboard.goodAfternoon') : t('dashboard.goodEvening');
   const name = user?.displayName || user?.fullName || 'there';
 
   if (loading) return <View style={st.center}><ActivityIndicator size="large" color={AIColors.primary} /></View>;
@@ -307,14 +310,30 @@ export default function DashboardScreen() {
               <Text style={st.greeting}>{greet},</Text>
               <Text style={st.name}>{name}!</Text>
             </View>
-            <TouchableOpacity style={st.avatar} onPress={logout}>
-              <Text style={st.avatarTxt}>{(name[0] ?? 'U').toUpperCase()}</Text>
-            </TouchableOpacity>
+            <View style={st.headerRight}>
+              <View style={st.langToggle}>
+                <TouchableOpacity
+                  style={[st.langBtn, language === 'en' && st.langBtnActive]}
+                  onPress={() => void setLanguage('en')}
+                >
+                  <Text style={[st.langBtnText, language === 'en' && st.langBtnTextActive]}>EN</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[st.langBtn, language === 'ta' && st.langBtnActive]}
+                  onPress={() => void setLanguage('ta')}
+                >
+                  <Text style={[st.langBtnText, language === 'ta' && st.langBtnTextActive]}>த</Text>
+                </TouchableOpacity>
+              </View>
+              <TouchableOpacity style={st.avatar} onPress={logout}>
+                <Text style={st.avatarTxt}>{(name[0] ?? 'U').toUpperCase()}</Text>
+              </TouchableOpacity>
+            </View>
           </View>
           {/* Notice */}
           <View style={st.notice}>
             <Text style={st.noticeTxt}>
-              This app helps you discover financial opportunities. Applications are processed on official external websites.
+              {t('dashboard.notice')}
             </Text>
           </View>
 
@@ -340,7 +359,7 @@ export default function DashboardScreen() {
                     style={st.promptCustomInput}
                     value={customOccupationSubtype}
                     onChangeText={setCustomOccupationSubtype}
-                    placeholder="Type your occupation subtype"
+                    placeholder={t('dashboard.promptPlaceholder')}
                     placeholderTextColor={AIColors.textMuted}
                     editable={!savingPrompt}
                     autoCapitalize="words"
@@ -350,12 +369,12 @@ export default function DashboardScreen() {
                     onPress={() => void submitCustomOccupationSubtype()}
                     disabled={!customOccupationSubtype.trim() || savingPrompt}
                   >
-                    <Text style={st.promptCustomBtnText}>Save</Text>
+                    <Text style={st.promptCustomBtnText}>{t('dashboard.save')}</Text>
                   </TouchableOpacity>
                 </View>
               )}
               <TouchableOpacity onPress={() => setPromptDismissed(true)} disabled={savingPrompt}>
-                <Text style={st.promptSkip}>{savingPrompt ? 'Saving...' : 'Skip for now'}</Text>
+                <Text style={st.promptSkip}>{savingPrompt ? t('dashboard.saving') : t('dashboard.skipForNow')}</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -363,7 +382,7 @@ export default function DashboardScreen() {
           <View style={st.completenessCard}>
             <View style={st.completenessRow}>
               <View>
-                <Text style={st.completenessLabel}>Profile completeness</Text>
+                <Text style={st.completenessLabel}>{t('dashboard.profileCompleteness')}</Text>
                 <Text style={st.completenessValue}>{profileCompleteness}%</Text>
               </View>
               <View style={st.completenessRing}>
@@ -375,7 +394,7 @@ export default function DashboardScreen() {
             </View>
             <Text style={st.completenessLayer}>{profileLayer}</Text>
             {nextPrompt ? <Text style={st.completenessPrompt}>{nextPrompt}</Text> : null}
-            {missingFields.length > 0 ? <Text style={st.completenessMissing}>Missing: {missingFields.slice(0, 3).join(', ')}{missingFields.length > 3 ? '...' : ''}</Text> : null}
+            {missingFields.length > 0 ? <Text style={st.completenessMissing}>{t('dashboard.missing')}: {missingFields.slice(0, 3).join(', ')}{missingFields.length > 3 ? '...' : ''}</Text> : null}
             {unlockedCapabilities.length > 0 && (
               <View style={st.capabilityWrap}>
                 {unlockedCapabilities.slice(0, 4).map((cap) => (
@@ -390,7 +409,7 @@ export default function DashboardScreen() {
           <View style={[st.card, { borderColor: AIColors.borderGlow }]}>
             <View style={st.scoreRow}>
               <View>
-                <Text style={st.scoreLbl}>Financial Health Score</Text>
+                <Text style={st.scoreLbl}>{t('dashboard.healthScore')}</Text>
                 <Text style={[st.scoreNum, { color: scoreColor(score) }]}>
                   {score}<Text style={st.scoreOf}>/100</Text>
                 </Text>
@@ -403,17 +422,17 @@ export default function DashboardScreen() {
               <ProgressBar progress={score / 100} color={scoreColor(score)} />
             </View>
             <Text style={st.scoreTip}>
-              {score >= 75 ? 'Excellent! Keep it up.' : score >= 50 ? 'Good - boost savings to improve.' : 'Focus on reducing debt & saving more.'}
+              {score >= 75 ? t('dashboard.scoreExcellent') : score >= 50 ? t('dashboard.scoreGood') : t('dashboard.scoreFocus')}
             </Text>
           </View>
           {/* Stats */}
           {profile && (
             <View style={st.grid}>
               {[
-                { lbl: 'Income',   val: fmt(profile.monthlyIncome),   c: AIColors.primary },
-                { lbl: 'Savings',  val: fmt(profile.totalSavings),    c: AIColors.success },
-                { lbl: 'Expenses', val: fmt(profile.monthlyExpenses), c: AIColors.warning },
-                { lbl: 'Loans',    val: fmt(profile.existingLoans),   c: AIColors.error   },
+                { lbl: t('dashboard.income'),   val: fmt(profile.monthlyIncome),   c: AIColors.primary },
+                { lbl: t('dashboard.savings'),  val: fmt(profile.totalSavings),    c: AIColors.success },
+                { lbl: t('dashboard.expenses'), val: fmt(profile.monthlyExpenses), c: AIColors.warning },
+                { lbl: t('dashboard.loans'),    val: fmt(profile.existingLoans),   c: AIColors.error   },
               ].map((x) => (
                 <View key={x.lbl} style={st.statCard}>
                   <Text style={[st.statVal, { color: x.c }]}>{x.val}</Text>
@@ -425,14 +444,14 @@ export default function DashboardScreen() {
           {/* Benefits banner */}
           {totalBenefits > 0 && (
             <View style={st.benefitBanner}>
-              <Text style={st.benefitLbl}>Estimated yearly eligible benefits</Text>
+              <Text style={st.benefitLbl}>{t('dashboard.estimatedBenefits')}</Text>
               <Text style={st.benefitVal}>{fmt(totalBenefits)}/yr</Text>
             </View>
           )}
           {/* Scheme previews */}
           {schemes.length > 0 && (
             <>
-              <Text style={st.section}>Recommended for You</Text>
+              <Text style={st.section}>{t('dashboard.recommended')}</Text>
               {schemes.map((r) => (
                 <View key={r.scheme.scheme_id} style={st.schemeCard}>
                   <View style={st.schemeTop}>
@@ -448,7 +467,7 @@ export default function DashboardScreen() {
                   <Text style={st.schemeName}>{r.scheme.scheme_name}</Text>
                   <Text style={st.schemeDesc} numberOfLines={2}>{r.scheme.description}</Text>
                   <TouchableOpacity style={st.applyBtn} onPress={() => Linking.openURL(r.scheme.application_link)}>
-                    <Text style={st.applyTxt}>Apply Now</Text>
+                    <Text style={st.applyTxt}>{t('dashboard.applyNow')}</Text>
                   </TouchableOpacity>
                 </View>
               ))}
@@ -457,23 +476,23 @@ export default function DashboardScreen() {
           {/* Tips */}
           {tips.length > 0 && (
             <PriorityActionsQueue
-              title="Next Best Actions"
+              title={t('dashboard.nextBestActions')}
               items={tips.map((tip, i) => ({
                 id: `tip-${i}`,
                 title: tip,
-                ctaLabel: 'Open Tips',
+                ctaLabel: t('dashboard.openTips'),
                 onPress: () => nav.navigate('Tips'),
               }))}
             />
           )}
           {/* Quick actions */}
-          <Text style={st.section}>Quick Actions</Text>
+          <Text style={st.section}>{t('dashboard.quickActions')}</Text>
           <View style={st.actions}>
             {[
-              { icon: 'Edit', lbl: 'Update Profile',  fn: () => nav.navigate('FinancialInput') },
-              { icon: 'Tips', lbl: 'All Tips',         fn: () => nav.navigate('Tips') },
-              { icon: 'Invest', lbl: 'Investments',   fn: () => nav.navigate('InvestmentRecommendations') },
-              { icon: 'AI', lbl: 'AI Coach',          fn: () => nav.navigate('AIChat') },
+              { icon: 'Edit', lbl: t('dashboard.updateProfile'),  fn: () => nav.navigate('FinancialInput') },
+              { icon: 'Tips', lbl: t('dashboard.allTips'),         fn: () => nav.navigate('Tips') },
+              { icon: 'Invest', lbl: t('dashboard.investments'),   fn: () => nav.navigate('InvestmentRecommendations') },
+              { icon: 'AI', lbl: t('dashboard.aiCoach'),           fn: () => nav.navigate('AIChat') },
             ].map((a) => (
               <TouchableOpacity key={a.lbl} style={st.actionBtn} onPress={a.fn}>
                 <Text style={st.actionIcon}>{a.icon}</Text>
@@ -494,6 +513,31 @@ const st = StyleSheet.create({
   content: { flexGrow: 1, padding: AISpacing.md, paddingBottom: 140 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: AIColors.background },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: AISpacing.md },
+  headerRight: { flexDirection: 'row', alignItems: 'center', gap: AISpacing.sm },
+  langToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: AIColors.border,
+    borderRadius: AIRadius.full,
+    overflow: 'hidden',
+    backgroundColor: AIColors.surface,
+  },
+  langBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    backgroundColor: 'transparent',
+  },
+  langBtnActive: {
+    backgroundColor: AIColors.primary + '22',
+  },
+  langBtnText: {
+    ...AITypography.labelSmall,
+    color: AIColors.textMuted,
+  },
+  langBtnTextActive: {
+    color: AIColors.primary,
+  },
   greeting: { ...AITypography.label, color: AIColors.textSecondary },
   name: { ...AITypography.h1, color: AIColors.text, marginTop: 2 },
   avatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: AIColors.primaryDim, justifyContent: 'center', alignItems: 'center', borderWidth: 1.5, borderColor: AIColors.primary },

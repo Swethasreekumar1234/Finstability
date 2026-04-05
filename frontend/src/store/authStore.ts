@@ -37,6 +37,18 @@ const persistAuthSession = async (session: AuthSession) => {
   await AsyncStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(session));
 };
 
+const isConnectivityError = (error: unknown): boolean => {
+  const message = error instanceof Error ? error.message : String(error || '');
+  const lower = message.toLowerCase();
+  return (
+    lower.includes('backend unavailable')
+    || lower.includes('network request failed')
+    || lower.includes('failed to fetch')
+    || lower.includes('timeout')
+    || lower.includes('econnrefused')
+  );
+};
+
 interface AuthState {
   // Firebase User
   firebaseUid: string | null;
@@ -262,11 +274,17 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   // Google Sign-In
   signInWithGoogle: async ({ idToken, accessToken }) => {
     set({ isGoogleLoading: true, authError: null });
+    let fallbackEmail = '';
+    let fallbackName = 'User';
+    let fallbackUserId = '';
 
     try {
       const user = await signInWithGoogleCredential(idToken, accessToken);
       const uid = user.uid;
       const normalizedEmail = normalizeEmail(user.email || '');
+      fallbackEmail = normalizedEmail;
+      fallbackName = user.displayName || normalizedEmail || 'User';
+      fallbackUserId = deriveStableUserId(uid, normalizedEmail);
 
       const existingProfileByUserId = await apiService.getProfileByUserId(uid);
       const existingProfileByEmail = !existingProfileByUserId && normalizedEmail
@@ -338,6 +356,33 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       return { success: true, isNewUser: false };
     } catch (error: any) {
+      if (isConnectivityError(error)) {
+        const fallbackUser: User = {
+          phoneNumber: '',
+          fullName: fallbackName,
+          displayName: fallbackName,
+          email: fallbackEmail,
+          userType: UserType.STUDENT,
+          monthlyIncome: 0,
+          riskTolerance: RiskTolerance.MODERATE,
+          createdAt: Date.now(),
+        };
+        await persistAuthSession({
+          userId: fallbackUserId,
+          email: fallbackEmail || undefined,
+          fullName: fallbackName,
+        });
+        set({
+          firebaseUid: fallbackUserId,
+          email: fallbackEmail,
+          fullName: fallbackName,
+          currentUser: fallbackUser,
+          isLoggedIn: true,
+          isGoogleLoading: false,
+          authError: null,
+        });
+        return { success: true, isNewUser: false };
+      }
       set({
         isGoogleLoading: false,
         authError: error.message || 'Google sign-in failed',
@@ -385,6 +430,33 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       return { success: true };
     } catch (error: any) {
+      if (isConnectivityError(error)) {
+        const fallbackUser: User = {
+          phoneNumber: '',
+          fullName: cleanEmail.split('@')[0] || 'User',
+          displayName: cleanEmail.split('@')[0] || 'User',
+          email: cleanEmail,
+          userType: UserType.STUDENT,
+          monthlyIncome: 0,
+          riskTolerance: RiskTolerance.MODERATE,
+          createdAt: Date.now(),
+        };
+        await persistAuthSession({
+          userId: `email:${cleanEmail}`,
+          email: cleanEmail,
+          fullName: fallbackUser.fullName,
+        });
+        set({
+          firebaseUid: `email:${cleanEmail}`,
+          email: cleanEmail,
+          fullName: fallbackUser.fullName,
+          currentUser: fallbackUser,
+          isLoggedIn: true,
+          isGoogleLoading: false,
+          authError: null,
+        });
+        return { success: true };
+      }
       set({
         isGoogleLoading: false,
         authError: error?.message || 'Sign in failed. Please try again.',
@@ -718,6 +790,28 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         return;
       }
 
+      if (sessionUserId || sessionEmail) {
+        const fallbackFullName = parsed?.fullName || sessionEmail?.split('@')[0] || 'User';
+        set({
+          firebaseUid: sessionUserId || deriveStableUserId(null, sessionEmail),
+          email: sessionEmail,
+          fullName: fallbackFullName,
+          currentUser: {
+            phoneNumber: '',
+            fullName: fallbackFullName,
+            displayName: fallbackFullName,
+            email: sessionEmail || '',
+            userType: UserType.STUDENT,
+            monthlyIncome: 0,
+            riskTolerance: RiskTolerance.MODERATE,
+            createdAt: Date.now(),
+          },
+          isLoggedIn: true,
+          isInitialized: true,
+        });
+        return;
+      }
+
       await AsyncStorage.removeItem(FINANCIAL_PROFILE_KEY);
       await AsyncStorage.removeItem(AUTH_SESSION_KEY);
       set({
@@ -728,9 +822,36 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         isLoggedIn: false,
         isInitialized: true,
       });
-      return;
     } catch (error) {
       console.error('Error initializing auth:', error);
+      try {
+        const rawSession = await AsyncStorage.getItem(AUTH_SESSION_KEY);
+        if (rawSession) {
+          const parsed = JSON.parse(rawSession) as AuthSession;
+          const sessionEmail = normalizeEmail(parsed?.email);
+          const fallbackFullName = parsed?.fullName || sessionEmail?.split('@')[0] || 'User';
+          set({
+            firebaseUid: parsed?.userId || deriveStableUserId(null, sessionEmail),
+            email: sessionEmail,
+            fullName: fallbackFullName,
+            currentUser: {
+              phoneNumber: '',
+              fullName: fallbackFullName,
+              displayName: fallbackFullName,
+              email: sessionEmail || '',
+              userType: UserType.STUDENT,
+              monthlyIncome: 0,
+              riskTolerance: RiskTolerance.MODERATE,
+              createdAt: Date.now(),
+            },
+            isLoggedIn: true,
+            isInitialized: true,
+          });
+          return;
+        }
+      } catch {
+        // Fall through to the safe initialized state below.
+      }
       set({ isInitialized: true });
     }
   },
