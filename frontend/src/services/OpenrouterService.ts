@@ -6,7 +6,7 @@ import { User, FinancialProfile, UserTypeLabels, RiskToleranceLabels } from '../
 const OPENROUTER_API_KEY = process.env.EXPO_PUBLIC_OPENROUTER_API_KEY ?? '';
 
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
-const MODEL = 'openrouter/free';
+const MODEL = 'meta-llama/llama-3.1-8b-instruct:free';
 
 export interface ChatMessage {
   role: 'user' | 'model';
