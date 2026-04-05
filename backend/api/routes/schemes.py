@@ -1,4 +1,5 @@
 from __future__ import annotations
+import re
 from typing import Any, Dict, List
 from fastapi import APIRouter, HTTPException
 from database.models import (
@@ -12,6 +13,29 @@ from eligibility.benefits import estimate_total_benefits
 from rag.retriever import retrieve_scheme_ids
 
 router = APIRouter()
+
+
+def _clean_text(value: str | None) -> str:
+    if not value:
+        return ""
+
+    cleaned = value
+    # Replace unicode dashes/bullets that can render as odd symbols on some devices.
+    cleaned = cleaned.replace("–", "-").replace("—", "-").replace("•", ", ")
+    # Expand common finance shorthand for readability.
+    cleaned = re.sub(r"\bu/s\b", "under Section", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\bL\b", "lakh", cleaned)
+    # Collapse extra whitespace introduced by replacements.
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    return cleaned
+
+
+def _clean_scheme_text(rec):
+    rec.scheme.scheme_name = _clean_text(rec.scheme.scheme_name)
+    rec.scheme.ministry = _clean_text(rec.scheme.ministry)
+    rec.scheme.description = _clean_text(rec.scheme.description)
+    rec.scheme.benefits = _clean_text(rec.scheme.benefits)
+    rec.scheme.eligibility = _clean_text(rec.scheme.eligibility)
 
 
 def _normalize_email(email: str | None) -> str | None:
@@ -135,6 +159,9 @@ async def recommend_schemes(profile: UserProfile):
             key=lambda r: (r.eligibility_match * (r.estimated_annual_benefit or 1000)),
             reverse=True,
         )
+
+        for rec in eligible:
+            _clean_scheme_text(rec)
 
         total = sum(r.estimated_annual_benefit for r in eligible)
         

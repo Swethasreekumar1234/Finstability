@@ -6,7 +6,13 @@ import { User, FinancialProfile, UserTypeLabels, RiskToleranceLabels } from '../
 const OPENROUTER_API_KEY = process.env.EXPO_PUBLIC_OPENROUTER_API_KEY ?? '';
 
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
-const MODEL = 'meta-llama/llama-3.1-8b-instruct:free';
+const CANDIDATE_MODELS = [
+  'qwen/qwen3.6-plus:free',
+  'arcee-ai/trinity-large-preview:free',
+  'stepfun/step-3.5-flash:free',
+  'minimax/minimax-m2.5:free',
+  'openrouter/free',
+];
 
 export interface ChatMessage {
   role: 'user' | 'model';
@@ -46,20 +52,54 @@ function buildSystemPrompt(user: User | null, profile: FinancialProfile | null):
   return lines.join('\n');
 }
 
+function shouldTryNextModel(status: number, errorText: string): boolean {
+  if (status === 404) return true;
+  const lower = errorText.toLowerCase();
+  return (
+    lower.includes('no endpoints found')
+    || lower.includes('model not found')
+    || lower.includes('provider unavailable')
+  );
+}
+
 async function callAPI(messages: any[]): Promise<Response> {
-  const body = JSON.stringify({ model: MODEL, messages, max_tokens: 512, temperature: 0.7 });
   const headers = {
     'Content-Type': 'application/json',
     'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
     'HTTP-Referer': 'https://finstability.app',
     'X-Title': 'Finstability',
   };
-  let res = await fetch(OPENROUTER_URL, { method: 'POST', headers, body });
-  if (res.status === 429 || res.status === 503) {
-    await new Promise(resolve => setTimeout(resolve, 3000));
-    res = await fetch(OPENROUTER_URL, { method: 'POST', headers, body });
+
+  let lastResponse: Response | null = null;
+  for (const model of CANDIDATE_MODELS) {
+    const body = JSON.stringify({ model, messages, max_tokens: 512, temperature: 0.7 });
+    let res = await fetch(OPENROUTER_URL, { method: 'POST', headers, body });
+
+    if (res.status === 429 || res.status === 503) {
+      await new Promise((resolve) => setTimeout(resolve, 1200));
+      res = await fetch(OPENROUTER_URL, { method: 'POST', headers, body });
+    }
+
+    if (res.ok) {
+      return res;
+    }
+
+    const errText = await res.clone().text();
+    lastResponse = res;
+    if (!shouldTryNextModel(res.status, errText)) {
+      return res;
+    }
   }
-  return res;
+
+  if (lastResponse) {
+    return lastResponse;
+  }
+
+  // Should never happen, but keep a deterministic fallback error.
+  return new Response(JSON.stringify({ error: { message: 'No AI models available' } }), {
+    status: 503,
+    headers: { 'Content-Type': 'application/json' },
+  });
 }
 
 export async function sendMessage(
